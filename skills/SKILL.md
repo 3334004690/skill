@@ -8,7 +8,19 @@ description: >
 
 # AI 媒体生成综合技能
 
-> 所有命令需在项目根目录下执行。
+## 路径定位（必须 — 所有平台通用）
+
+所有命令需在**项目根目录**下执行，否则脚本路径 `scripts/xxx.py` 会找不到文件。
+
+AI 必须通过 SKILL.md 自身路径定位项目根目录：
+
+```
+已知: SKILL.md 的完整路径（如 /xxx/skills/SKILL.md）
+推导: 项目根目录 = SKILL.md 路径的父目录的父目录 = /xxx/
+
+AI 执行任何命令前，先 cd 到项目根目录：
+  cd <项目根目录>
+```
 
 ## 前置检查
 
@@ -33,6 +45,9 @@ description: >
 用户提供本地文件时，AI 直接运行上传脚本：
 
 ```bash
+# 先切换到项目根目录，再执行脚本
+cd <项目根目录>
+
 # 上传单个文件
 python scripts/upload.py photo.jpg
 
@@ -75,6 +90,7 @@ python scripts/upload.py photo.jpg --json
 ### 第一步：列出模型表格（必须）
 
 ```bash
+cd <项目根目录>
 python scripts/ai_image.py --list-models
 ```
 
@@ -102,6 +118,9 @@ gpt-image-2          gpt-image-2           ❌ 自动映射: 9:16→4k | 16:9→
 根据用户选择的模型和参数传入：
 
 ```bash
+# 先切换到项目根目录
+cd <项目根目录>
+
 # 文生图 - Nano Banana
 python scripts/ai_image.py --model nano-banana --prompt "提示词" --proportion 16:9 --resolution 2k
 
