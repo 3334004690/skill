@@ -88,7 +88,8 @@ MODEL_KEY = "nano-banana"           # nano-banana / nano-banana-pro / gpt-image-
 PROMPT = "一只橘猫坐在窗边"         # 提示词
 PROPORTION = "16:9"                  # 比例
 RESOLUTION = "2k"                    # 仅 nano-banana/pro 有效，gpt-image-2 填 None
-INPUT_IMAGES = None                  # 上传的图片 [{tmp_url}...] 或 None
+INPUT_IMAGES = None                  # 上传的图片 [{tmp_url,name,type,size}...] 或 None
+                                      # ⚠️ 必须包含全部4个字段，后端要求完整 data 对象
 # ================================
 
 API_KEY = os.getenv("AIMAXHUG_API_KEY") or open(".env").read().split("=", 1)[1].strip()
@@ -130,7 +131,7 @@ url = data.get("data", {}).get("imageUrl", "")
 
 if url:
     print(f"\n✅ 生成成功！")
-    print(f"   📍 图片地址: {url}")
+    print(f"   📍 [点击预览图片]({url})")
     print(f"   📐 比例: {PROPORTION or '默认'}  分辨率: {body.get('resolution','N/A')}")
 else:
     print(f"\n❌ 失败: {data.get('message', '未知错误')}")
@@ -140,18 +141,17 @@ else:
 
 ## 第四步：展示结果
 
-生成完成后，按以下格式输出：
+生成完成后，按以下格式输出。URL 必须是**可点击的超链接**：
 
-```
+```markdown
 ✅ 生成成功！
 
-📍 图片地址: https://static.aimaxhug.com/xxx.jpg
+📍 [点击查看生成的图片](https://static.aimaxhug.com/xxx.jpg)
 📐 比例: 16:9  分辨率: 4k
 
-🖼️ 如果环境支持，直接展示图片
+<!-- 如果环境支持 markdown 图片渲染，直接内嵌预览 -->
+![生成结果](https://static.aimaxhug.com/xxx.jpg)
 ```
-
-> 注意：**不要下载图片**，直接展示 URL 路径即可。用户需要下载会自己处理。
 
 如果用户上传了多张参考图，上传后也展示：
 
