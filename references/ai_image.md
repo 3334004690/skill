@@ -85,7 +85,15 @@ python {baseDir}/scripts/ai_image.py run \
 |-------|------|---------|
 | **Nano Banana** | Manual | `1k` / `2k` / `4k` (default: `1k`) |
 | **Nano Banana Pro** | Manual | `1k` / `2k` / `4k` (default: `1k`) |
-| **gpt-image-2** | Auto (from proportion) | `9:16`/`16:9` → `4k`, `1:1` → `2k`, others → `1k` |
+| **gpt-image-2** | Auto (from proportion) | `1:1` → `4k`, `9:16` → `4k`, `16:9` → `4k` |
+
+## Supported Proportions (per model)
+
+| Model | Supported Proportions |
+|-------|----------------------|
+| **Nano Banana** | `1:1` `9:16` `16:9` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `21:9` (10种) |
+| **Nano Banana Pro** | `1:1` `9:16` `16:9` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `21:9` (10种) |
+| **gpt-image-2** | `1:1` `9:16` `16:9` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `21:9` (10种) |
 
 ## Model Recommendation
 

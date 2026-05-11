@@ -61,7 +61,8 @@ def cmd_run(args):
             sys.exit(1)
 
         results.append(data)
-        print(f"   ✅ [点击预览]({data['tmp_url']})", file=sys.stderr)
+        print(f"   ✅ {data['tmp_url']}", file=sys.stderr)
+        print(f"      ![]({data['tmp_url']})", file=sys.stderr)
         print(f"      类型: {data['type']}  大小: {data['size'] / 1024:.1f} KB", file=sys.stderr)
 
     if args.json:
@@ -70,7 +71,8 @@ def cmd_run(args):
         print(f"\n✅ 上传完成，共 {len(results)} 个文件", file=sys.stderr)
         for i, data in enumerate(results):
             print(f"\n  [{i+1}] {data['name']}")
-            print(f"      📍 [点击预览]({data['tmp_url']})")
+            print(f"      📍 {data['tmp_url']}")
+            print(f"      ![]({data['tmp_url']})")
             print(f"      tmp_url: {data['tmp_url']}")
             print(f"      name: {data['name']}")
             print(f"      type: {data['type']}")

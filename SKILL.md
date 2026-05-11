@@ -116,9 +116,12 @@ python scripts/ai_image.py run --model gpt-image-2 --prompt "提示词" --propor
 
 | 需求 | 推荐模型 |
 |------|---------|
-| 默认首选 | **Nano Banana** — 速度快、性价比高 |
-| 更高画质 | **Nano Banana Pro** |
-| 照片级写实/艺术风格 | **gpt-image-2** |
+| 默认首选 | **Nano Banana** — 速度快、性价比高，支持10种比例 |
+| 更高画质 | **Nano Banana Pro** — 支持10种比例 |
+| 照片级写实/艺术风格 | **gpt-image-2** — 仅支持 `1:1` `9:16` `16:9`，分辨率自动固定 `4k` |
+
+> ⚠️ 每个模型支持的**比例不同**，展示模型表格时会列出各模型专属的比例列表。
+> ⚠️ **gpt-image-2** 不支持 `--resolution`，任何比例下分辨率固定为 `4k`。
 
 ---
 
@@ -137,7 +140,8 @@ python scripts/ai_image.py run --model gpt-image-2 --prompt "提示词" --propor
 ```text
 ✅ 生成成功！
 
-📍 [点击查看生成的图片](URL)
+📍 URL
+🖼️  ![](URL)
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
   📐 比例: 16:9
   🔍 分辨率: 4k
@@ -147,7 +151,7 @@ python scripts/ai_image.py run --model gpt-image-2 --prompt "提示词" --propor
 ```
 
 **格式要求：**
-1. 图片链接放在最前面
+1. 图片链接放在最前面（URL 单独一行 + markdown 图片语法各一行，让平台自动展示）
 2. 关键元数据：比例、分辨率、模型
 3. 提供调整选项
 
