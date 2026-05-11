@@ -286,33 +286,50 @@ def print_result(result):
 
 
 def print_models():
-    """列出所有模型及详细参数"""
+    """列出所有模型及详细参数 — 表格形式，供用户选择"""
     print()
-    print("📷 可用生图模型")
-    print("=" * 70)
+    print("=" * 90)
+    print("📷 可用生图模型 — 请选择并告诉我以下参数")
+    print("=" * 90)
+
+    # 表头
+    header = f"{'模型名称':<20} {'模型Key':<22} {'分辨率':<24} {'支持比例'}"
+    sep = "─" * 90
+    print(f"\n{header}")
+    print(sep)
+
     for key, m in MODELS.items():
-        print(f"\n  {key}")
-        print(f"  {'─' * 40}")
-        print(f"  模型名:    {m['name']}")
-        print(f"  API 值:    {m['api_model']}")
-        print(f"  说明:      {m['desc']}")
+        name = m["name"]
 
         if m["resolution_mode"] == "manual":
-            print(f"  分辨率:    ✅ 支持手动选择 {' / '.join(m['resolutions'])}")
+            res = f"✅ {' / '.join(m['resolutions'])}"
+        else:
+            rmap = m.get("resolution_map", {})
+            rules = " | ".join(f"{k}→{v}" for k, v in rmap.items())
+            res = f"❌ 自动映射: {rules}"
+
+        props = " / ".join(ALL_PROPORTIONS[:5])
+        props += " ..."
+
+        print(f"{name:<20} {key:<22} {res:<24} {props}")
+
+    print(sep)
+    print(f"共 {len(MODELS)} 个模型，所有模型支持比例: {' / '.join(ALL_PROPORTIONS)}")
+    print()
+
+    # 详细说明
+    for key, m in MODELS.items():
+        print(f"  [{key}] {m['name']} — {m['desc']}")
+        if m["resolution_mode"] == "manual":
+            print(f"      分辨率: {' / '.join(m['resolutions'])}（手动选择）")
         else:
             rmap = m.get("resolution_map", {})
             rules = "  ".join(f"{k}→{v}" for k, v in rmap.items())
-            print(f"  分辨率:    ❌ 不支持手动选择")
-            print(f"  自动映射:  {rules}")
-            print(f"  默认:      {m['default_resolution']}")
+            print(f"      分辨率: 不支持手动选，自动映射: {rules}，默认 {m['default_resolution']}")
+        print()
 
-        print(f"  支持比例:  {'  '.join(ALL_PROPORTIONS)}")
-    print()
-    print("=" * 70)
-    print("💡 提示: gpt-image-2 不支持手动选分辨率")
-    print("   9:16 / 16:9 → 4k")
-    print("   1:1         → 2k")
-    print("   其他比例    → 1k")
+    print("请选择模型并告诉我：提示词、比例、分辨率（如适用）")
+    print("=" * 90)
     print()
 
 

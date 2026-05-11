@@ -68,42 +68,46 @@ python scripts/upload.py photo.jpg --json
 
 ## 二、图像生成
 
-### 列出模型（用户选择）
+> ⚠️ 流程要求：用户请求生图时，**必须先展示模型表格让用户选择**，不能 AI 自己决定。
+
+### 第一步：列出模型表格（必须）
 
 ```bash
 python scripts/ai_image.py --list-models
 ```
 
-输出每个模型的完整参数约束：
+展示效果：
 
-| 模型 | 定位 | 分辨率 |
-|------|------|--------|
-| **Nano Banana** | 标准生图（默认） | 手动 1k/2k/4k |
-| **Nano Banana Pro** | 高质量生图 | 手动 1k/2k/4k |
-| **gpt-image-2** | 照片级写实/风格 | 自动按比例映射 |
+```
+══════════════════════════════════════════════════════════════════════════════
+📷 可用生图模型 — 请选择并告诉我以下参数
+══════════════════════════════════════════════════════════════════════════════
 
-### 执行生图
+模型名称             模型Key                分辨率                   支持比例
+──────────────────────────────────────────────────────────────────────────
+Nano Banana          nano-banana           ✅ 1k / 2k / 4k          1:1 / 9:16 / 16:9 / 2:3 / 3:2 ...
+Nano Banana Pro      nano-banana-pro       ✅ 1k / 2k / 4k          1:1 / 9:16 / 16:9 / 2:3 / 3:2 ...
+gpt-image-2          gpt-image-2           ❌ 自动映射: 9:16→4k | 16:9→4k | 1:1→2k ...
+
+请选择模型并告诉我：提示词、比例、分辨率（如适用）
+══════════════════════════════════════════════════════════════════════════════
+```
+
+展示后**等待用户选择**，根据用户回复执行第二步。
+
+### 第二步：执行生图
+
+根据用户选择的模型和参数传入：
 
 ```bash
 # 文生图 - Nano Banana
 python scripts/ai_image.py --model nano-banana --prompt "提示词" --proportion 16:9 --resolution 2k
 
-# 图生图 - Nano Banana Pro（自动上传）
+# 图生图 - Nano Banana Pro（自动上传本地图片）
 python scripts/ai_image.py --model nano-banana-pro --prompt "编辑指令" --input-images photo.jpg --proportion 16:9 --resolution 4k
 
 # 文生图 - gpt-image-2（不需要 --resolution）
 python scripts/ai_image.py --model gpt-image-2 --prompt "提示词" --proportion 9:16
-```
-
-### 模型选择
-
-```
-用户请求生图
-  ├── 指定模型         ──→ 对应模型
-  ├── 高画质/商业级    ──→ nano-banana-pro
-  ├── 日常快速出图     ──→ nano-banana
-  ├── 照片级写实/风格  ──→ gpt-image-2
-  └── 未明确偏好       ──→ nano-banana（默认）
 ```
 
 ### 注意事项
@@ -112,6 +116,7 @@ python scripts/ai_image.py --model gpt-image-2 --prompt "提示词" --proportion
   - `9:16` / `16:9` → 4k
   - `1:1` → 2k
   - 其他 → 1k
+- **Nano Banana / Pro** 支持手动选择分辨率 `1k` / `2k` / `4k`（默认 `1k`）
 - 图生图时，上传的 `{tmp_url, name, type, size}` 四个字段都会自动传给后端
 
 ### 输出
