@@ -1,117 +1,71 @@
 #!/usr/bin/env python3
-"""
-文件上传脚本 — AI 直接运行，无需写代码
-======================================
+"""Upload local files to Aimaxhug and return temp URL + metadata.
 
-【AI 使用说明】
-  当用户提供了本地文件需要上传时，直接执行本脚本。
-  上传后返回的 data 对象完整传给生图接口的 original_image 参数。
+## AGENT INSTRUCTIONS — READ FIRST
+- Default flow: use `run` to upload one or more files.
+- Do NOT ask the user to upload manually — handle it for them.
+- The returned data object (tmp_url/name/type/size) is passed to
+  ai_image.py's --input-images for image-to-image generation.
 
-用法:
-  # 上传单个文件
-  python scripts/upload.py photo.jpg
+Subcommands:
+    run           Upload file(s) and print result — DEFAULT
 
-  # 上传多个文件
-  python scripts/upload.py photo1.jpg photo2.png
-
-  # 输出 JSON 格式（供其他脚本调用）
-  python scripts/upload.py photo.jpg --json
+Usage:
+    python upload.py run photo.jpg
+    python upload.py run photo1.jpg photo2.png
+    python upload.py run photo.jpg --json
 """
 
 import argparse
-import json
+import json as json_mod
 import mimetypes
-import os
 import sys
 from pathlib import Path
 
-import requests
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from shared.client import AimaxhugClient, AimaxhugError
+from shared.config import load_config
+
+UPLOAD_ENDPOINT = "/api/v2/upload/file"
 
 
-# 项目根目录：由脚本位置自动定位，不受工作目录影响
-PROJECT_ROOT = Path(__file__).resolve().parent.parent
-ENV_PATH = PROJECT_ROOT / ".env"
-
-BASE_URL = "https://base-api.aimaxhug.com"
-UPLOAD_URL = f"{BASE_URL}/api/v2/upload/file"
+def add_upload_args(p):
+    p.add_argument("files", nargs="+", help="本地文件路径（支持多个）")
+    p.add_argument("--json", action="store_true", help="以 JSON 格式输出结果")
+    return p
 
 
-def get_api_key():
-    """从 .env 文件读取 API Key（自动定位项目根目录）"""
-    key = os.getenv("AIMAXHUG_API_KEY")
-    if key:
-        return key
-    if ENV_PATH.exists():
-        for line in ENV_PATH.read_text(encoding="utf-8").strip().splitlines():
-            if line.startswith("AIMAXHUG_API_KEY="):
-                return line.split("=", 1)[1].strip()
-    print(f"❌ 未找到 API Key。文件不存在: {ENV_PATH}", file=sys.stderr)
-    print("   请在项目根目录创建 .env 文件: echo AIMAXHUG_API_KEY=sk-xxx > .env", file=sys.stderr)
-    print("   🔑 前往 https://aimaxhug.com 注册获取 API Key（点击跳转）", file=sys.stderr)
-    sys.exit(1)
-
-
-def upload_file(file_path):
-    """
-    上传单个文件，返回完整 data 对象
-
-    返回: {"tmp_url": str, "name": str, "type": str, "size": int}
-    """
-    path = Path(file_path)
-    if not path.exists():
-        print(f"❌ 文件不存在: {file_path}", file=sys.stderr)
-        sys.exit(1)
-
-    key = get_api_key()
-
-    # 显式获取 MIME 类型，避免 requests 默认推断出错
-    mime_type, _ = mimetypes.guess_type(path.name)
-    if not mime_type:
-        mime_type = "application/octet-stream"
-
-    with open(path, "rb") as f:
-        resp = requests.post(
-            UPLOAD_URL,
-            headers={"Authorization": f"Bearer {key}"},
-            files={"file": (path.name, f, mime_type)},
-            timeout=120,
-        )
-
-    data = resp.json()
-    if resp.status_code != 200 or data.get("status") != 200:
-        print(f"❌ 上传失败: {data.get('message', resp.text)}", file=sys.stderr)
-        sys.exit(1)
-
-    return data["data"]  # {tmp_url, name, type, size}
-
-
-def main():
-    parser = argparse.ArgumentParser(
-        description="文件上传 — AI 直接运行，无需写代码",
-        epilog="""
-【AI 使用说明】
-  1. 用户提供本地文件路径时，直接执行本脚本
-  2. 上传返回的 data 对象（含 tmp_url/name/type/size）传给生图接口
-  3. 多个文件用空格分隔
-        """,
-    )
-    parser.add_argument("files", nargs="+", help="要上传的文件路径（支持多个）")
-    parser.add_argument("--json", action="store_true", help="以 JSON 格式输出结果（供脚本调用）")
-
-    args = parser.parse_args()
+def cmd_run(args):
+    """Upload file(s) and print result."""
+    client = AimaxhugClient()
 
     results = []
     for file_path in args.files:
         path = Path(file_path)
+        if not path.exists():
+            print(f"Error: 文件不存在: {file_path}", file=sys.stderr)
+            sys.exit(1)
+
+        # Detect MIME type
+        mime_type, _ = mimetypes.guess_type(path.name)
+        if not mime_type:
+            mime_type = "application/octet-stream"
+
         print(f"📤 上传中: {path.name}...", file=sys.stderr)
-        data = upload_file(file_path)
+
+        try:
+            data = client.post_file(UPLOAD_ENDPOINT, str(path), mime_type)
+        except AimaxhugError as e:
+            print(f"Error: 上传失败: {e}", file=sys.stderr)
+            sys.exit(1)
+
         results.append(data)
         print(f"   ✅ [点击预览]({data['tmp_url']})", file=sys.stderr)
         print(f"      类型: {data['type']}  大小: {data['size'] / 1024:.1f} KB", file=sys.stderr)
 
     if args.json:
-        # JSON 格式输出，供其他脚本程序化调用
-        print(json.dumps(results, indent=2, ensure_ascii=False))
+        print(json_mod.dumps(results, indent=2, ensure_ascii=False))
     else:
         print(f"\n✅ 上传完成，共 {len(results)} 个文件", file=sys.stderr)
         for i, data in enumerate(results):
@@ -123,10 +77,34 @@ def main():
             print(f"      size: {data['size']}")
         print()
 
-        # 最后一行为 JSON 数组，方便管道传递
         print("---")
-        print("将以下 data 对象传入生图接口的 original_image 参数（数组格式）:")
-        print(json.dumps(results, indent=2, ensure_ascii=False))
+        print("将以下 data 对象传入 ai_image.py 的 --input-images 参数:")
+        print(json_mod.dumps(results, indent=2, ensure_ascii=False))
+
+
+def main():
+    parser = argparse.ArgumentParser(
+        description="文件上传 — 上传本地文件到 Aimaxhug",
+        formatter_class=argparse.RawDescriptionHelpFormatter,
+    )
+    sub = parser.add_subparsers(dest="subcommand", required=False)
+
+    # run
+    p_run = sub.add_parser("run", help="上传文件（默认）")
+    add_upload_args(p_run)
+
+    args = parser.parse_args()
+
+    if args.subcommand is None or args.subcommand == "run":
+        # If no subcommand but files are provided, treat as run
+        if hasattr(args, "files") and args.files:
+            cmd_run(args)
+        else:
+            parser.print_help()
+            sys.exit(1)
+    else:
+        parser.print_help()
+        sys.exit(1)
 
 
 if __name__ == "__main__":
