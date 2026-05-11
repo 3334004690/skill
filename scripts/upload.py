@@ -20,6 +20,7 @@
 
 import argparse
 import json
+import mimetypes
 import os
 import sys
 from pathlib import Path
@@ -27,21 +28,26 @@ from pathlib import Path
 import requests
 
 
+# 项目根目录：由脚本位置自动定位，不受工作目录影响
+PROJECT_ROOT = Path(__file__).resolve().parent.parent
+ENV_PATH = PROJECT_ROOT / ".env"
+
 BASE_URL = "https://base-api.aimaxhug.com"
 UPLOAD_URL = f"{BASE_URL}/api/v2/upload/file"
 
 
 def get_api_key():
-    """从 .env 文件读取 API Key"""
+    """从 .env 文件读取 API Key（自动定位项目根目录）"""
     key = os.getenv("AIMAXHUG_API_KEY")
     if key:
         return key
-    env_path = Path(".env")
-    if env_path.exists():
-        for line in env_path.read_text().strip().splitlines():
+    if ENV_PATH.exists():
+        for line in ENV_PATH.read_text(encoding="utf-8").strip().splitlines():
             if line.startswith("AIMAXHUG_API_KEY="):
                 return line.split("=", 1)[1].strip()
-    print("❌ 未找到 API Key。请在 .env 文件中设置 AIMAXHUG_API_KEY=sk-xxx", file=sys.stderr)
+    print(f"❌ 未找到 API Key。文件不存在: {ENV_PATH}", file=sys.stderr)
+    print("   请在项目根目录创建 .env 文件: echo AIMAXHUG_API_KEY=sk-xxx > .env", file=sys.stderr)
+    print("   🔑 前往 https://aimaxhug.com 注册获取 API Key（点击跳转）", file=sys.stderr)
     sys.exit(1)
 
 
@@ -58,11 +64,16 @@ def upload_file(file_path):
 
     key = get_api_key()
 
+    # 显式获取 MIME 类型，避免 requests 默认推断出错
+    mime_type, _ = mimetypes.guess_type(path.name)
+    if not mime_type:
+        mime_type = "application/octet-stream"
+
     with open(path, "rb") as f:
         resp = requests.post(
             UPLOAD_URL,
             headers={"Authorization": f"Bearer {key}"},
-            files={"file": f},
+            files={"file": (path.name, f, mime_type)},
             timeout=120,
         )
 

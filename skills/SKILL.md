@@ -8,7 +8,7 @@ description: >
 
 # AI 媒体生成综合技能
 
-> 所有命令需在项目根目录 `D:\dyl-skill\zk-skill` 下执行。
+> 所有命令需在项目根目录下执行。
 
 ## 前置检查
 
@@ -21,6 +21,8 @@ description: >
 
 > 无需前置验证 Token，API 会自动校验，无效时会返回 401 错误提示。
 > 不要在输出中回显完整 Token，只展示前 8 位：`sk-abc123...****`
+>
+> ❗ 没有 API Key 或余额不足时，提示用户前往 [https://aimaxhug.com](https://aimaxhug.com) 注册获取（可点击跳转）
 
 ---
 
