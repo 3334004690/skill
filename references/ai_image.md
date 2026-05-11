@@ -68,6 +68,28 @@ python {baseDir}/scripts/ai_image.py run \
   --resolution 4k
 ```
 
+### Multi-Image Generation (Parallel)
+
+```bash
+# Generate 5 images with auto styles (runs in parallel!)
+python {baseDir}/scripts/ai_image.py run \
+  --model gpt-image-2 \
+  --prompt "赛博朋克城市" \
+  --count 5 \
+  --proportion 16:9
+
+# Generate 3 images with specific styles
+python {baseDir}/scripts/ai_image.py run \
+  --model nano-banana \
+  --prompt "一只猫" \
+  --count 3 \
+  --styles 写实 卡通 油画 \
+  --proportion 1:1 \
+  --resolution 4k
+```
+
+> ⭐ **Don't run multi-image tasks one by one!** Use `--count N` — the script runs all N tasks in parallel automatically.
+
 ## Options
 
 | Option | Description |
@@ -77,6 +99,8 @@ python {baseDir}/scripts/ai_image.py run \
 | `--proportion` | Aspect ratio, e.g. `16:9`, `1:1`, `9:16` |
 | `--resolution` | `1k` / `2k` / `4k` — only for nano-banana/pro, do NOT pass for gpt-image-2 |
 | `--input-images` | Local file path(s) for image-to-image (space-separated) |
+| `--count` | Number of images to generate (default: 1). **When > 1, all tasks run in parallel** |
+| `--styles` | Custom styles for multi-image generation, space-separated. E.g. `--styles 写实 卡通 油画` |
 | `--json` | Output result as JSON |
 
 ## Resolution Rules

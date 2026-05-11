@@ -108,7 +108,18 @@ python scripts/ai_image.py run --model nano-banana-pro --prompt "编辑指令" -
 
 # gpt-image-2 不需要 --resolution
 python scripts/ai_image.py run --model gpt-image-2 --prompt "提示词" --proportion 9:16
+
+# ⭐ 多图生成（并行执行！）— 用 --count 指定数量，--styles 可选指定风格
+python scripts/ai_image.py run --model gpt-image-2 --prompt "赛博朋克城市" --count 5 --proportion 16:9
+python scripts/ai_image.py run --model nano-banana --prompt "一只猫" --count 3 --proportion 1:1 --resolution 4k
+python scripts/ai_image.py run --model nano-banana --prompt "一只猫" --count 3 --styles 写实 卡通 油画 --proportion 1:1 --resolution 4k
 ```
+
+> ⭐ **多图生成规则**：
+> - `--count N` = 一次生成 N 张图，**脚本自动并行执行**，不需要逐张跑
+> - `--styles 风格1 风格2 ...` = 可选，指定每张图的风格
+> - 不指定 `--styles` → 自动分配不同风格（写实、卡通、油画、赛博朋克等）
+> - **AI 不允许一张一张跑！用户说生成多张图时，必须用 `--count` 一次完成**
 
 详细见 [ai_image.md](references/ai_image.md)。
 
@@ -163,6 +174,8 @@ python scripts/ai_image.py run --model gpt-image-2 --prompt "提示词" --propor
 |------|------|------|
 | 文生图 | Available | `scripts/ai_image.py run` (不带 `--input-images`) |
 | 图生图 | Available | `scripts/ai_image.py run` (带 `--input-images`) |
+| 多图并行生成 | Available | `scripts/ai_image.py run --count N` (自动不同风格) |
+| 自定义风格生成 | Available | `scripts/ai_image.py run --count N --styles 写实 卡通 ...` |
 | 列出模型 | Available | `scripts/ai_image.py list-models` |
 | 文件上传 | Available | `scripts/upload.py run` |
 | 视频生成 | Not available | 暂无视频 API |
