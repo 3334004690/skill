@@ -7,7 +7,8 @@ import requests
 
 from .config import load_config
 
-BASE_URL = "https://base-api.aimaxhug.com"
+# BASE_URL = "https://base-api.aimaxhug.com"
+BASE_URL = "http://localhost:3200"
 
 
 class AimaxhugError(Exception):
