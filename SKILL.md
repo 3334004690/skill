@@ -72,18 +72,7 @@ AI 执行任何命令前，先 cd 到项目根目录。
 
 ## 工作流程
 
-### 一、文件上传
-
-用户提供本地文件时直接运行：
-
-```bash
-cd <项目根目录>
-python scripts/upload.py run photo.jpg
-```
-
-详细见 [upload.md](references/upload.md)。
-
-### 二、图像生成
+### 一、图像生成
 
 **必须按以下顺序执行：**
 
@@ -126,7 +115,7 @@ python scripts/ai_image.py run --model nano-banana --prompt "一只猫" --count 
 
 详细见 [ai_image.md](references/ai_image.md)。
 
-### 三、视频生成
+### 二、视频生成
 
 **必须按以下顺序执行：**
 
