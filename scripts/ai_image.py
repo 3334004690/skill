@@ -37,10 +37,13 @@ Usage:
 import argparse
 import json as json_mod
 import mimetypes
+import os
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+
+import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
@@ -185,6 +188,34 @@ def build_body(model, prompt, proportion, resolution, input_data):
     return body
 
 
+def _ensure_direct_url(client, image_url):
+    """Download image and re-upload to ensure a directly displayable URL.
+
+    Some returned image URLs serve streams that can't be rendered inline.
+    Re-uploading via the upload endpoint guarantees a universally accessible URL.
+    """
+    import tempfile
+
+    try:
+        resp = requests.get(image_url, timeout=60)
+        ct = (resp.headers.get("Content-Type") or "").split(";")[0].strip()
+        if not ct.startswith("image/"):
+            return image_url
+
+        ext = mimetypes.guess_extension(ct) or ".jpg"
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+            tmp.write(resp.content)
+            tmp_path = tmp.name
+        try:
+            data = client.post_file(UPLOAD_ENDPOINT, tmp_path, ct)
+            return data.get("tmp_url", image_url)
+        finally:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+    except Exception:
+        return image_url
+
+
 def generate_one(client, model, body, index, total):
     """Generate a single image. Returns dict with success/image_url/prompt."""
     try:
@@ -196,6 +227,9 @@ def generate_one(client, model, body, index, total):
     if not url:
         return {"success": False, "error": "返回数据中没有 imageUrl", "index": index}
 
+    # Re-upload so the image displays inline regardless of source URL type
+    url = _ensure_direct_url(client, url)
+
     # Extract a short style label for display
     prompt_text = body.get("prompt", "")
     style_label = ""
@@ -203,6 +237,8 @@ def generate_one(client, model, body, index, total):
         if prompt_text.endswith(s):
             style_label = s
             break
+
+    print(f"  ✅ [{index}/{total}] {style_label or '生成'}完成", file=sys.stderr)
 
     return {
         "success": True,
