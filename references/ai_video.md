@@ -1,13 +1,14 @@
 # AI Video Module
 
-Generate videos from text prompts or with reference images using Kling / Vidu.
+Generate videos using Kling / Vidu. 支持三种模式。
 
 ## Supported Task Types
 
-| Type | Description |
-|------|-------------|
-| **Text-to-Video** | Generate a video from a text prompt (no `--input-images`) |
-| **Image-to-Video** | Generate a video with reference images (pass `--input-images`) |
+| Type | Description | Input |
+|------|-------------|-------|
+| **文生视频 (Text-to-Video)** | Generate from text prompt only | No `--input-images` |
+| **图生视频 (Image-to-Video)** | Generate with reference images | `--input-images` with image files |
+| **视频生视频 (Video-to-Video)** | Generate with reference video | `--input-images` with video files (⚠️ high cost) |
 
 ## Subcommands
 
@@ -76,6 +77,19 @@ python {baseDir}/scripts/ai_video.py run \
   --proportion 9:16
 ```
 
+### Video-to-Video (⚠️ High Cost)
+
+```bash
+# Kling with reference video
+python {baseDir}/scripts/ai_video.py run \
+  --model kling \
+  --prompt "转换成电影风格" \
+  --input-images source.mp4 \
+  --proportion 16:9
+```
+
+> ⚠️ **视频生视频消耗巨大**，AI 必须提前告知用户并确认后再执行。
+
 ### Multi-Video Generation (Parallel)
 
 ```bash
@@ -99,7 +113,7 @@ python {baseDir}/scripts/ai_video.py run \
 | `--proportion` | Aspect ratio: `16:9`, `9:16`, `1:1` |
 | `--duration` | Duration in seconds: `5`, `10`, `15` (default: `5`)。传入参考素材时仅支持 5-10 秒 |
 | `--resolution` | `720p` / `1080p` / `4k`（4k 仅可灵支持，Vidu 不支持） |
-| `--input-images` | Local image path(s) for image-to-video (space-separated) |
+| `--input-images` | 参考素材路径（传图=图生视频，传视频=视频生视频，不传=文生视频） |
 | `--count` | Number of videos to generate (default: 1, max: 5). **When > 1, tasks run in parallel** |
 | `--json` | Output result as JSON |
 
@@ -115,12 +129,13 @@ python {baseDir}/scripts/ai_video.py run \
 | 场景 | 说明 |
 |------|------|
 | 文生视频 + 15 秒 | 所有模型均支持 |
-| 图生视频 + 15 秒 | **不支持**，脚本会提示但继续请求；如失败请换 5/10 秒 |
+| 图生/视频生视频 + 15 秒 | **不支持**，脚本会提示但继续请求；如失败请换 5/10 秒 |
 | Vidu + 4k | **不支持**，脚本会提示但继续请求；如失败请换 720p/1080p |
 | Kling + 4k | 仅文生视频支持，图生视频不保证 |
 
 ## Notes
 
-- Video generation typically takes 1–3 minutes
-- Reference images are optional — omit for pure text-to-video
+- Video generation typically takes 1–3 minutes（视频生视频可能更久）
+- 不传 `--input-images` = 文生视频；传图片 = 图生视频；传视频 = 视频生视频
 - When providing multiple reference images, the first becomes the start frame and the last becomes the end frame (Vidu首尾帧)
+- **视频生视频消耗巨大，请谨慎使用**

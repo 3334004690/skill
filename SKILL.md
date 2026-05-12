@@ -153,10 +153,18 @@ python scripts/ai_video.py run --model vidu --prompt "提示词" --proportion 9:
 # 图生视频
 python scripts/ai_video.py run --model vidu --prompt "提示词" --input-images photo.jpg --proportion 9:16
 
+# ⭐ 视频生视频（消耗巨大，必须警告用户确认）
+python scripts/ai_video.py run --model kling --prompt "提示词" --input-images video.mp4 --proportion 16:9
+
 # ⭐ 多视频并行生成 — 用 --count 指定数量
 python scripts/ai_video.py run --model kling --prompt "赛博朋克城市" --count 3 --proportion 16:9 --resolution 720p
 ```
 
+> **三种模式说明**：
+> - **文生视频** — 仅传 `--prompt`，不传 `--input-images`
+> - **图生视频** — 传 `--prompt` + `--input-images`（图片文件）
+> - **视频生视频** — 传 `--prompt` + `--input-images`（视频文件，⚠️ **消耗巨大，必须提前告知用户并确认**）
+>
 > ⭐ **多视频生成规则**：
 > - `--count N` = 一次生成 N 个视频，**脚本自动并行执行**
 > - **AI 不允许一个一个跑！用户说生成多个视频时，必须用 `--count` 一次完成**
@@ -222,6 +230,7 @@ python scripts/ai_video.py run --model kling --prompt "赛博朋克城市" --cou
 | 列出模型 | Available | `scripts/ai_image.py list-models` |
 | 文件上传 | Available | `scripts/upload.py run` |
 | 文生视频 | Available | `scripts/ai_video.py run` (不带 `--input-images`) |
-| 图生视频 | Available | `scripts/ai_video.py run` (带 `--input-images`) |
+| 图生视频 | Available | `scripts/ai_video.py run` (带 `--input-images` 图片) |
+| 视频生视频 | Available（消耗巨大） | `scripts/ai_video.py run` (带 `--input-images` 视频) |
 | 多视频并行生成 | Available | `scripts/ai_video.py run --count N` |
 | 列出视频模型 | Available | `scripts/ai_video.py list-models` |

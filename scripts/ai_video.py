@@ -1,23 +1,33 @@
 #!/usr/bin/env python3
 """Generate videos using Aimaxhug API (Kling / Vidu).
 
+三种模式：
+  文生视频      — 仅传 --prompt（不传 --input-images）
+  图生视频      — 传 --prompt + --input-images（图片文件）
+  视频生视频    — 传 --prompt + --input-images（视频文件，消耗巨大，谨慎使用）
+
 ## AGENT INSTRUCTIONS — READ FIRST
 - Default flow: ALWAYS use `run` (generate + show result).
 - Before generating, show `list-models` so user can choose model/params.
 - Do NOT pick a model for the user — show the table and let them choose.
 - Multi-video (--count > 1): tasks run in parallel automatically.
   Do NOT run multi-video tasks sequentially — use --count and let the script parallelize.
+- 视频生视频消耗巨大，务必提前告知用户并确认。
+  ️检测到输入文件中有视频时自动弹出警告，不要自行决定。
 
 Subcommands:
     run           Generate videos — DEFAULT
     list-models   Show supported models and parameter constraints
 
 Usage:
-    # Single video
+    # 文生视频
     python ai_video.py run --model kling --prompt "..." --proportion 16:9 --resolution 720p
 
-    # Image-to-video
+    # 图生视频
     python ai_video.py run --model vidu --prompt "..." --input-images photo.jpg --proportion 9:16
+
+    # 视频生视频（消耗巨大）
+    python ai_video.py run --model kling --prompt "..." --input-images video.mp4 --proportion 16:9
 
     # Multi-video parallel
     python ai_video.py run --model kling --prompt "..." --count 3 --proportion 16:9
@@ -184,7 +194,12 @@ def cmd_list_models(args):
         print(f"      ⚠️  传入参考素材（图生视频）时不支持 15 秒，仅 5-10 秒")
         print()
 
-    print("请选择模型并告诉我：提示词、比例、时长、分辨率（如适用）")
+    print("支持三种模式:")
+    print("  文生视频   — 仅传提示词（默认）")
+    print("  图生视频   — 传提示词 + 参考图片")
+    print("  视频生视频 — 传提示词 + 参考视频（⚠️ 消耗巨大，谨慎使用）")
+    print()
+    print("请选择模型并告诉我：提示词、模式、比例、时长、分辨率（如适用）")
     print("=" * 100)
     print()
 
@@ -207,7 +222,7 @@ def add_generate_args(p):
     p.add_argument("--resolution", default=None,
                    help="分辨率: 720p/1080p/4k")
     p.add_argument("--input-images", nargs="+", default=None,
-                   help="本地图片路径，传了=图生视频，不传=文生视频")
+                   help="参考素材路径（传图=图生视频，传视频=视频生视频，不传=文生视频）")
     p.add_argument("--count", type=int, default=1,
                    help="生成数量（默认 1，>1 时自动并行）")
     p.add_argument("--json", action="store_true",
@@ -258,11 +273,23 @@ def cmd_run(args):
         print(f"   当前仍按 4k 请求，如失败请换用 720p 或 1080p。", file=sys.stderr)
 
     input_data = None
+    has_video_ref = False
     if args.input_images:
         input_data = []
         for path in args.input_images:
             data = upload_file(AimaxhugClient(), path)
             input_data.append(data)
+            if data.get("type", "").startswith("video/"):
+                has_video_ref = True
+
+    # --- 视频生视频警告 ---
+    if has_video_ref:
+        print(file=sys.stderr)
+        print("⚠️ ⚠️ ⚠️  警告：视频生视频模式  ⚠️ ⚠️ ⚠️", file=sys.stderr)
+        print("   检测到输入文件中包含视频，将使用「视频生视频」模式。", file=sys.stderr)
+        print("   此模式消耗巨大，生成时间可能显著延长。", file=sys.stderr)
+        print("   请确认是否继续。", file=sys.stderr)
+        print(file=sys.stderr)
 
     if count == 1:
         prompts = [args.prompt]
@@ -279,11 +306,13 @@ def cmd_run(args):
         bodies.append(body)
 
     if count == 1:
-        print(f"🎬 正在使用 {model['name']} 生成视频...（通常需要 1-3 分钟）", file=sys.stderr)
+        mode_label = "文生视频" if not input_data else ("视频生视频" if has_video_ref else "图生视频")
+        print(f"🎬 正在使用 {model['name']} 进行{mode_label}（通常需要 1-3 分钟）", file=sys.stderr)
         result = generate_one(client, model, bodies[0], 1, 1)
         _display_results([(0, result)], model, proportion, duration, resolution, input_data, args.json)
     else:
-        print(f"🎬 正在使用 {model['name']} 并行生成 {count} 个视频...", file=sys.stderr)
+        mode_label = "文生视频" if not input_data else ("视频生视频" if has_video_ref else "图生视频")
+        print(f"🎬 正在使用 {model['name']} 并行生成 {count} 个{mode_label}...", file=sys.stderr)
         results = []
         with ThreadPoolExecutor(max_workers=min(count, 5)) as pool:
             futures = {
@@ -328,6 +357,10 @@ def _display_results(results, model, proportion, duration, resolution, input_dat
 
     # Text output
     print()
+    mode_label = "文生视频"
+    if input_data:
+        mode_label = "视频生视频" if any(d.get("type", "").startswith("video/") for d in input_data) else "图生视频"
+
     if total == 1 and successes:
         r = successes[0]
         print("✅ 生成成功！")
@@ -339,12 +372,14 @@ def _display_results(results, model, proportion, duration, resolution, input_dat
         print(f"  ⏱  时长: {duration or model['default_duration']}秒")
         print(f"  🔍 分辨率: {resolution or model['default_resolution']}")
         print(f"  🤖 模型: {model['name']}")
+        print(f"  📋 模式: {mode_label}")
     elif successes:
         print(f"✅ 全部生成完成！（共 {total} 个视频）")
         print(f"🤖 模型: {model['name']}")
         print(f"📐 比例: {proportion or '16:9'}")
         print(f"⏱  时长: {duration or model['default_duration']}秒")
         print(f"🔍 分辨率: {resolution or model['default_resolution']}")
+        print(f"📋 模式: {mode_label}")
         print()
         for i, r in enumerate(successes):
             print(f"━━━ [{i + 1}/{total}] ━━━")
