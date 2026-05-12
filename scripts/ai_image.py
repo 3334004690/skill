@@ -80,7 +80,7 @@ AUTO_STYLES = [
 
 MODELS = {
     "nano-banana": {
-        "api_model": "gemini-3-pro-image-preview",
+        "api_model": "gemini-3.1-flash-image-preview",
         "name": "Nano Banana",
         "desc": "标准图像生成，速度快、性价比高",
         "proportions": ["1:1", "9:16", "16:9", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "21:9"],
@@ -89,9 +89,18 @@ MODELS = {
         "default_resolution": "1k",
     },
     "nano-banana-pro": {
-        "api_model": "gemini-3.1-flash-image-preview",
+        "api_model": "gemini-3-pro-image-preview",
         "name": "Nano Banana Pro",
         "desc": "高质量图像生成，Nano Banana 上位替代",
+        "proportions": ["1:1", "9:16", "16:9", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "21:9"],
+        "resolution_mode": "manual",
+        "resolutions": ["1k", "2k", "4k"],
+        "default_resolution": "1k",
+    },
+    "doubao-seedream-5-0-260128": {
+        "api_model": "doubao-seedream-5-0-260128",
+        "name": "Seedream 5.0",
+        "desc": "高品质图像生成，细节丰富、色彩鲜艳",
         "proportions": ["1:1", "9:16", "16:9", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "21:9"],
         "resolution_mode": "manual",
         "resolutions": ["1k", "2k", "4k"],

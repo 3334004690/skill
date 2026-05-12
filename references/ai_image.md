@@ -46,6 +46,13 @@ python {baseDir}/scripts/ai_image.py run \
   --model gpt-image-2 \
   --prompt "赛博朋克城市夜景" \
   --proportion 9:16
+
+# Seedream 5.0 — manual resolution
+python {baseDir}/scripts/ai_image.py run \
+  --model doubao-seedream-5-0-260128 \
+  --prompt "夕阳下的山峦，层次分明" \
+  --proportion 16:9 \
+  --resolution 2k
 ```
 
 ### Image-to-Image (with reference)
@@ -95,7 +102,7 @@ python {baseDir}/scripts/ai_image.py run \
 
 | Option | Description |
 |--------|-------------|
-| `--model` | Model key: `nano-banana`, `nano-banana-pro`, `gpt-image-2` (required) |
+| `--model` | Model key: `nano-banana`, `nano-banana-pro`, `doubao-seedream-5-0-260128`, `gpt-image-2` (required) |
 | `--prompt` | Text prompt describing the image (required) |
 | `--proportion` | Aspect ratio, e.g. `16:9`, `1:1`, `9:16` |
 | `--resolution` | `1k` / `2k` / `4k` — only for nano-banana/pro, do NOT pass for gpt-image-2 |
@@ -110,6 +117,7 @@ python {baseDir}/scripts/ai_image.py run \
 |-------|------|---------|
 | **Nano Banana** | Manual | `1k` / `2k` / `4k` (default: `1k`) |
 | **Nano Banana Pro** | Manual | `1k` / `2k` / `4k` (default: `1k`) |
+| **Seedream 5.0** | Manual | `1k` / `2k` / `4k` (default: `1k`) |
 | **gpt-image-2** | Auto (from proportion) | `1:1` → `4k`, `9:16` → `4k`, `16:9` → `4k` |
 
 ## Supported Proportions (per model)
@@ -118,6 +126,7 @@ python {baseDir}/scripts/ai_image.py run \
 |-------|----------------------|
 | **Nano Banana** | `1:1` `9:16` `16:9` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `21:9` (10种) |
 | **Nano Banana Pro** | `1:1` `9:16` `16:9` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `21:9` (10种) |
+| **Seedream 5.0** | `1:1` `9:16` `16:9` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `21:9` (10种) |
 | **gpt-image-2** | `1:1` `9:16` `16:9` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `21:9` (10种) |
 
 ## Model Recommendation
@@ -126,4 +135,5 @@ python {baseDir}/scripts/ai_image.py run \
 |----------|-------------------|
 | **Best overall (default)** | Nano Banana |
 | **Higher quality** | Nano Banana Pro |
+| **细节丰富/色彩鲜艳** | Seedream 5.0 |
 | **Photo-realistic / art style** | gpt-image-2 |
