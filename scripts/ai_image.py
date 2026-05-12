@@ -288,6 +288,12 @@ def cmd_run(args):
     proportion = args.proportion
     count = args.count or 1
 
+    # Cap count at 14
+    MAX_COUNT = 14
+    if count > MAX_COUNT:
+        print(f"Error: 最多一次性生成 {MAX_COUNT} 张，当前设置 {count}", file=sys.stderr)
+        sys.exit(1)
+
     # Validate proportion
     if proportion and proportion not in model_props:
         print(f"Error: {model['name']} 不支持比例 {proportion}", file=sys.stderr)

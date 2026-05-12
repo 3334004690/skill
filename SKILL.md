@@ -120,6 +120,8 @@ python scripts/ai_image.py run --model nano-banana --prompt "一只猫" --count 
 > - `--styles 风格1 风格2 ...` = 可选，指定每张图的风格
 > - 不指定 `--styles` → 自动分配不同风格（写实、卡通、油画、赛博朋克等）
 > - **AI 不允许一张一张跑！用户说生成多张图时，必须用 `--count` 一次完成**
+> - **最多一次性生成 14 张**（`--count` 最大 14）
+> - ⚠️ **禁止同时执行多条命令**，每次只能执行一条命令，等上一条完成后才能执行下一条
 
 详细见 [ai_image.md](references/ai_image.md)。
 

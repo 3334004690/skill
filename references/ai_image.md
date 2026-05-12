@@ -89,6 +89,7 @@ python {baseDir}/scripts/ai_image.py run \
 ```
 
 > ⭐ **Don't run multi-image tasks one by one!** Use `--count N` — the script runs all N tasks in parallel automatically.
+> ⚠️ Max `--count` is **14**. Single command at a time — wait for completion before next.
 
 ## Options
 
@@ -99,7 +100,7 @@ python {baseDir}/scripts/ai_image.py run \
 | `--proportion` | Aspect ratio, e.g. `16:9`, `1:1`, `9:16` |
 | `--resolution` | `1k` / `2k` / `4k` — only for nano-banana/pro, do NOT pass for gpt-image-2 |
 | `--input-images` | Local file path(s) for image-to-image (space-separated) |
-| `--count` | Number of images to generate (default: 1). **When > 1, all tasks run in parallel** |
+| `--count` | Number of images to generate (default: 1, max: 14). **When > 1, all tasks run in parallel** |
 | `--styles` | Custom styles for multi-image generation, space-separated. E.g. `--styles 写实 卡通 油画` |
 | `--json` | Output result as JSON |
 
