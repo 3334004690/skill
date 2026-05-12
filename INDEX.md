@@ -13,6 +13,7 @@ description: >
 |------|-----------|
 | 图像生成 | 生图、画图、AI绘图、文生图、生成图片、create image、generate image、text to image |
 | 图片编辑 | 修改图片、编辑图片、换背景、风格迁移、图生图、image to image、image edit |
+| 视频生成 | 生视频、文生视频、图生视频、AI视频、可灵、Kling、Vidu、generate video、text to video |
 | 文件上传 | 上传文件、上传图片、upload file、upload image |
 
 ## 文件结构
@@ -21,10 +22,12 @@ description: >
 SKILL.md                 ← 主技能入口（AI 读取）
 scripts/
   ai_image.py            ← 生图脚本
+  ai_video.py            ← 生视频脚本（可灵 / Vidu）
   upload.py              ← 上传脚本
   shared/                ← 共享模块（config, client）
 references/
   ai_image.md            ← 生图参考文档
+  ai_video.md            ← 生视频参考文档
   upload.md              ← 上传参考文档
 ```
 

@@ -6,7 +6,7 @@ author:
   name: aimaxhug
 license: Apache-2.0
 metadata:
-  tags: ai, image, text2image, image2image, image-edit, upload, aimaxhug
+  tags: ai, image, text2image, image2image, image-edit, upload, video, text2video, kling, vidu, aimaxhug
   requires:
     bins: [python3]
     python: ">=3.8"
@@ -62,7 +62,8 @@ AI 执行任何命令前，先 cd 到项目根目录。
 
 | 模块 | 脚本 | 参考文档 | 说明 |
 |------|------|---------|------|
-| AI 图像生成 | `scripts/ai_image.py` | [ai_image.md](references/ai_image.md) | 文生图、图生图，支持 3 个模型 |
+| AI 图像生成 | `scripts/ai_image.py` | [ai_image.md](references/ai_image.md) | 文生图、图生图，支持 4 个模型 |
+| AI 视频生成 | `scripts/ai_video.py` | [ai_video.md](references/ai_video.md) | 文生视频、图生视频，支持可灵 / Vidu |
 | 文件上传 | `scripts/upload.py` | [upload.md](references/upload.md) | 上传本地文件，返回临时 URL |
 
 > **读参考文档了解具体参数和示例。**
@@ -125,6 +126,45 @@ python scripts/ai_image.py run --model nano-banana --prompt "一只猫" --count 
 
 详细见 [ai_image.md](references/ai_image.md)。
 
+### 三、视频生成
+
+**必须按以下顺序执行：**
+
+**第一步 — 展示模型表格（必须！）**
+
+```bash
+cd <项目根目录>
+python scripts/ai_video.py list-models
+```
+
+展示后等待用户选择模型、比例、时长、分辨率。
+
+**第二步 — 执行生成**
+
+```bash
+cd <项目根目录>
+
+# 文生视频
+python scripts/ai_video.py run --model kling --prompt "提示词" --proportion 16:9 --duration 5 --resolution 720p
+
+# 15秒时长
+python scripts/ai_video.py run --model vidu --prompt "提示词" --proportion 9:16 --duration 15 --resolution 720p
+
+# 图生视频
+python scripts/ai_video.py run --model vidu --prompt "提示词" --input-images photo.jpg --proportion 9:16
+
+# ⭐ 多视频并行生成 — 用 --count 指定数量
+python scripts/ai_video.py run --model kling --prompt "赛博朋克城市" --count 3 --proportion 16:9 --resolution 720p
+```
+
+> ⭐ **多视频生成规则**：
+> - `--count N` = 一次生成 N 个视频，**脚本自动并行执行**
+> - **AI 不允许一个一个跑！用户说生成多个视频时，必须用 `--count` 一次完成**
+> - **最多一次性生成 5 个**（`--count` 最大 5）
+> - ⚠️ **禁止同时执行多条命令**，每次只能执行一条命令，等上一条完成后才能执行下一条
+
+详细见 [ai_video.md](references/ai_video.md)。
+
 ### 模型选择指南
 
 | 需求 | 推荐模型 |
@@ -181,4 +221,7 @@ python scripts/ai_image.py run --model nano-banana --prompt "一只猫" --count 
 | 自定义风格生成 | Available | `scripts/ai_image.py run --count N --styles 写实 卡通 ...` |
 | 列出模型 | Available | `scripts/ai_image.py list-models` |
 | 文件上传 | Available | `scripts/upload.py run` |
-| 视频生成 | Not available | 暂无视频 API |
+| 文生视频 | Available | `scripts/ai_video.py run` (不带 `--input-images`) |
+| 图生视频 | Available | `scripts/ai_video.py run` (带 `--input-images`) |
+| 多视频并行生成 | Available | `scripts/ai_video.py run --count N` |
+| 列出视频模型 | Available | `scripts/ai_video.py list-models` |
