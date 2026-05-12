@@ -41,6 +41,7 @@ import json as json_mod
 import mimetypes
 import os
 import sys
+import tempfile
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
@@ -112,6 +113,33 @@ def upload_file(client, file_path):
     return data
 
 
+def _ensure_direct_url(client, video_url):
+    """Download video and re-upload to ensure a directly displayable URL.
+
+    Some returned video URLs serve streams that can't be embedded inline.
+    Re-uploading via the upload endpoint guarantees a universally accessible URL.
+    """
+    try:
+        resp = requests.get(video_url, timeout=120, stream=True)
+        ct = (resp.headers.get("Content-Type") or "").split(";")[0].strip()
+        if not ct.startswith("video/"):
+            return video_url
+
+        ext = mimetypes.guess_extension(ct) or ".mp4"
+        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
+            tmp.write(resp.content)
+            tmp_path = tmp.name
+        try:
+            print(f"  📤 重新上传视频以确保可直接播放...", file=sys.stderr)
+            data = client.post_file(UPLOAD_ENDPOINT, tmp_path, ct)
+            return data.get("tmp_url", video_url)
+        finally:
+            if os.path.exists(tmp_path):
+                os.unlink(tmp_path)
+    except Exception:
+        return video_url
+
+
 def build_body(model, prompt, proportion, duration, resolution, input_data):
     """Build request body for video generation."""
     body = {
@@ -146,6 +174,9 @@ def generate_one(client, model, body, index, total):
     video_url = data.get("data", {}).get("url") or data.get("data", {}).get("videoUrl", "")
     if not video_url:
         return {"success": False, "error": "返回数据中没有视频地址", "index": index}
+
+    # Re-upload so the video plays inline regardless of source URL type
+    video_url = _ensure_direct_url(client, video_url)
 
     print(f"  ✅ [{index}/{total}] 生成完成", file=sys.stderr)
 
