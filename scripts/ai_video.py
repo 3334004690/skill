@@ -119,8 +119,7 @@ def build_body(model, prompt, proportion, duration, resolution, input_data):
         "model": model["api_model"],
     }
 
-    if input_data:
-        body["images"] = input_data
+    body["images"] = input_data if input_data else []
 
     body["duration"] = duration or model["default_duration"]
     body["aspect_ratio"] = proportion or "16:9"
