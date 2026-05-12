@@ -47,9 +47,9 @@ class AimaxhugClient:
         url = f"{BASE_URL}{path}" if path.startswith("/") else path
         try:
             resp = requests.post(url, headers=self.headers, json=json,
-                                 timeout=kwargs.pop("timeout", 120), **kwargs)
+                                 timeout=kwargs.pop("timeout", 900), **kwargs)
         except requests.exceptions.Timeout:
-            raise AimaxhugError("请求超时（>120秒）", 0)
+            raise AimaxhugError("请求超时（>900秒）", 0)
         except requests.exceptions.ConnectionError:
             raise AimaxhugError("网络连接失败，请检查网络", 0)
 
