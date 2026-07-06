@@ -1,7 +1,7 @@
 ---
 name: ai-media-generation
 description: "AI 媒体生成技能。生图、画图、文生图、图生图、编辑图片、换背景、上传文件。所有网络请求均指向 base-api.aimaxhug.com。"
-homepage: https://aimaxhug.com
+homepage: https://api.aimaxhug.cloud
 author:
   name: aimaxhug
 license: Apache-2.0
@@ -51,9 +51,9 @@ AI 执行任何命令前，先 cd 到项目根目录。
 3. **不需要用户操作终端** — AI 自己运行脚本，用户只需选择模型和说需求。
 4. **不发浏览器弹窗** — 所有链接直接发给用户点击。
 5. **生图前必须先展示模型表格** — 用 `list-models` 列出所有模型让用户选择，不能自己决定。
-6. **无 API Key 时引导** — 提示用户创建 `.env` 文件，引导到 https://aimaxhug.com 注册。
+6. **无 API Key 时引导** — 提示用户创建 `.env` 文件，引导到 https://api.aimaxhug.cloud 注册。
 7. **结果导向** — 生成完成后直接展示图片链接，中间过程不啰嗦。
-8. **不提额外注册** — aimaxhug.com 注册页面即含登录+注册。
+8. **不提额外注册** — api.aimaxhug.cloud 注册页面即含登录+注册。
 9. **不要问"要不要"** — 明显需要的就去做，比如用户说"生图"直接走流程。
 
 ---

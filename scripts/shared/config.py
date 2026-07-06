@@ -38,7 +38,7 @@ def load_config() -> dict:
         "Error: API key not found.\n\n"
         "Create .env file in the project root:\n"
         '  echo AIMAXHUG_API_KEY=sk-xxx > .env\n\n'
-        "Get your API key at: https://aimaxhug.com\n",
+        "Get your API key at: https://api.aimaxhug.cloud\n",
         file=sys.stderr,
     )
     sys.exit(1)
