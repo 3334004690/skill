@@ -277,3 +277,4 @@ python scripts/ai_video.py run --model kling --prompt "赛博朋克城市" --cou
 | 长文本音频 | Available | `scripts/ai_audio.py run --long`（`/v1/minimax/audio/long`） |
 | 声音克隆 | Available | `scripts/ai_audio.py run --input-audio voice.mp3`（只能一个文件，时长 >10 秒且 <2 分钟，先调用上传接口并使用 `/audio/long`） |
 | 列出音频模型 | Available | `scripts/ai_audio.py list-models` |
+| 短视频解析 | Available | `scripts/video_parse.py run --url <分享链接>` |
