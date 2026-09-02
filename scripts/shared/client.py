@@ -64,6 +64,28 @@ class AimaxhugClient:
 
         return data
 
+    def get(self, path: str, params: Optional[dict] = None, **kwargs) -> dict:
+        """GET an authenticated endpoint and return parsed JSON."""
+        url = f"{BASE_URL}{path}" if path.startswith("/") else path
+        try:
+            resp = requests.get(url, headers=self.headers, params=params,
+                                timeout=kwargs.pop("timeout", 120), **kwargs)
+        except requests.exceptions.Timeout:
+            raise AimaxhugError("请求超时（>120秒）", 0)
+        except requests.exceptions.ConnectionError:
+            raise AimaxhugError("网络连接失败，请检查网络", 0)
+
+        try:
+            data = resp.json()
+        except ValueError:
+            raise AimaxhugError(f"响应解析失败: {resp.text[:200]}", resp.status_code)
+
+        if resp.status_code < 200 or resp.status_code >= 300:
+            msg = data.get("message", f"HTTP {resp.status_code}")
+            raise AimaxhugError(msg, resp.status_code)
+
+        return data
+
     def post_file(self, path: str, file_path: str, mime_type: str, **kwargs) -> dict:
         """POST a multipart file upload and return parsed JSON."""
         url = f"{BASE_URL}{path}" if path.startswith("/") else path

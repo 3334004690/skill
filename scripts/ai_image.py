@@ -27,8 +27,8 @@ Usage:
     # Image-to-image
     python ai_image.py run --model nano-banana-pro --prompt "..." --input-images photo.jpg --proportion 16:9
 
-    # gpt-image-2 (no --resolution)
-    python ai_image.py run --model gpt-image-2 --prompt "..." --proportion 9:16
+    # gpt-image-2 (dynamic pixel size)
+    python ai_image.py run --model gpt-image-2 --prompt "..." --resolution 1024x1536
 
     # List models
     python ai_image.py list-models
@@ -38,6 +38,7 @@ import argparse
 import json as json_mod
 import mimetypes
 import os
+import re
 import sys
 import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -109,16 +110,26 @@ MODELS = {
         "resolutions": ["1k", "2k", "4k"],
         "default_resolution": "1k",
     },
+    "doubao-seedream-5-0-pro-260628": {
+        "api_model": "doubao-seedream-5-0-pro-260628",
+        "name": "Seedream 5.0 Pro",
+        "desc": "更高品质图像生成，细节与复杂场景表现更强",
+        "proportions": ["1:1", "9:16", "16:9", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "21:9"],
+        "resolution_mode": "manual",
+        "resolutions": ["1k", "2k", "4k"],
+        "default_resolution": "1k",
+    },
     "gpt-image-2": {
         "api_model": "gpt-image-2",
         "name": "gpt-image-2",
         "desc": "照片级写实、精准构图、艺术风格",
         "proportions": ["1:1", "9:16", "16:9", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "21:9"],
-        "resolution_mode": "auto",
-        # ⚠️ gpt-image-2 分辨率由比例自动决定：
-        #    1:1 → 4k    9:16 → 4k    16:9 → 4k
-        "resolution_map": {"1:1": "4k", "9:16": "4k", "16:9": "4k"},
-        "default_resolution": "4k",
+        "resolution_mode": "dynamic",
+        "resolutions": [
+            "auto", "1024x1024", "2048x2048", "1536x1024",
+            "2048x1152", "3840x2160", "1024x1536", "2160x3840",
+        ],
+        "default_resolution": "auto",
     },
 }
 
@@ -171,19 +182,22 @@ def build_body(model, prompt, proportion, resolution, input_data):
     if input_data:
         body["original_image"] = input_data
 
-    if proportion:
+    # A custom gpt-image-2 pixel size is authoritative; omit a potentially
+    # conflicting aspect-ratio hint when WIDTHxHEIGHT was supplied.
+    custom_dynamic_size = (
+        model["resolution_mode"] == "dynamic"
+        and resolution
+        and resolution != "auto"
+    )
+    if proportion and not custom_dynamic_size:
         body["proportion"] = proportion
 
     # Resolution
     if model["resolution_mode"] == "manual":
         r = resolution or model["default_resolution"]
         body["resolution"] = r
-    elif model["resolution_mode"] == "auto":
-        rmap = model.get("resolution_map", {})
-        if proportion and proportion in rmap:
-            body["resolution"] = rmap[proportion]
-        else:
-            body["resolution"] = model["default_resolution"]
+    elif model["resolution_mode"] in ("auto", "dynamic"):
+        body["resolution"] = resolution or model["default_resolution"]
 
     return body
 
@@ -268,10 +282,10 @@ def cmd_list_models(args):
     for key, m in MODELS.items():
         if m["resolution_mode"] == "manual":
             res = f"✅ 手动: {' / '.join(m['resolutions'])}"
+        elif m["resolution_mode"] == "auto":
+            res = "⚠️ 自动"
         else:
-            rmap = m.get("resolution_map", {})
-            rules = "  ".join(f"{k}→{v}" for k, v in rmap.items())
-            res = f"⚠️ 自动: {rules}"
+            res = "✅ 动态: auto 或 WIDTHxHEIGHT"
 
         props = " / ".join(m["proportions"])
         print(f"{m['name']:<18} {key:<20} {res:<28} {props}")
@@ -284,11 +298,11 @@ def cmd_list_models(args):
         print(f"      支持比例 ({len(m['proportions'])}种): {' / '.join(m['proportions'])}")
         if m["resolution_mode"] == "manual":
             print(f"      分辨率: {' / '.join(m['resolutions'])}（手动选择，默认 {m['default_resolution']}）")
-        else:
-            rmap = m.get("resolution_map", {})
-            rules = "  ".join(f"{k}→{v}" for k, v in rmap.items())
+        elif m["resolution_mode"] == "auto":
             print(f"      分辨率: 不支持手动选择，由比例自动决定")
-            print(f"      映射规则: {rules}")
+        else:
+            print(f"      分辨率: auto 或 WIDTHxHEIGHT（宽高均 ≤3840，须为16的倍数）")
+            print(f"      约束: 总像素 655,360–8,294,400，长宽比不超过 3:1")
         print()
 
     print("请选择模型并告诉我：提示词、比例、分辨率（如适用）")
@@ -309,7 +323,7 @@ def add_generate_args(p):
     p.add_argument("--proportion", default=None,
                    help="比例，如 16:9、1:1、9:16 等")
     p.add_argument("--resolution", default=None,
-                   help="分辨率 1k/2k/4k（仅 nano-banana/pro 有效，gpt-image-2 勿传）")
+                   help="分辨率：普通模型用 1k/2k/4k；gpt-image-2 用 auto 或 WIDTHxHEIGHT")
     p.add_argument("--input-images", nargs="+", default=None,
                    help="本地图片路径，传了=图生图，不传=文生图")
     p.add_argument("--count", type=int, default=1,
@@ -345,13 +359,38 @@ def cmd_run(args):
         print(f"   该模型支持: {' / '.join(model_props)}", file=sys.stderr)
         sys.exit(1)
 
-    # Validate resolution for manual models
+    # Validate model-specific resolution
     if model["resolution_mode"] == "manual":
         r = args.resolution or model["default_resolution"]
         if r not in model["resolutions"]:
             print(f"Error: 不支持的分辨率: {r}", file=sys.stderr)
             print(f"   可选: {', '.join(model['resolutions'])}", file=sys.stderr)
             sys.exit(1)
+    elif model["resolution_mode"] == "dynamic":
+        r = args.resolution or model["default_resolution"]
+        if r != "auto":
+            match = re.fullmatch(r"(\d+)[x×](\d+)", r)
+            if not match:
+                print(f"Error: {model['name']} 分辨率必须为 auto 或 WIDTHxHEIGHT，例如 2048x1152", file=sys.stderr)
+                sys.exit(1)
+
+            width, height = (int(value) for value in match.groups())
+            pixels = width * height
+            ratio = max(width, height) / min(width, height) if min(width, height) else float("inf")
+            errors = []
+            if width > 3840 or height > 3840:
+                errors.append("宽和高都不能超过 3840px")
+            if width % 16 or height % 16:
+                errors.append("宽和高都必须是 16px 的倍数")
+            if ratio > 3:
+                errors.append("长边与短边比例不能超过 3:1")
+            if pixels < 655_360 or pixels > 8_294_400:
+                errors.append("总像素必须在 655,360 至 8,294,400 之间")
+            if errors:
+                print(f"Error: {model['name']} 分辨率 {r} 不符合要求：", file=sys.stderr)
+                for error in errors:
+                    print(f"   - {error}", file=sys.stderr)
+                sys.exit(1)
     elif args.resolution:
         print(f"Warning: {model['name']} 不支持手动选择分辨率，忽略 --resolution", file=sys.stderr)
 

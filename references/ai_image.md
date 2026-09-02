@@ -41,11 +41,11 @@ python {baseDir}/scripts/ai_image.py run \
   --proportion 16:9 \
   --resolution 2k
 
-# gpt-image-2 — no --resolution needed
+# gpt-image-2 — dynamic pixel size (auto or WIDTHxHEIGHT)
 python {baseDir}/scripts/ai_image.py run \
   --model gpt-image-2 \
   --prompt "赛博朋克城市夜景" \
-  --proportion 9:16
+  --resolution 2160x3840
 
 # Seedream 5.0 — manual resolution
 python {baseDir}/scripts/ai_image.py run \
@@ -53,6 +53,13 @@ python {baseDir}/scripts/ai_image.py run \
   --prompt "夕阳下的山峦，层次分明" \
   --proportion 16:9 \
   --resolution 2k
+
+# Seedream 5.0 Pro — manual resolution
+python {baseDir}/scripts/ai_image.py run \
+  --model doubao-seedream-5-0-pro-260628 \
+  --prompt "建筑效果图，材质细节清晰" \
+  --proportion 16:9 \
+  --resolution 4k
 ```
 
 ### Image-to-Image (with reference)
@@ -102,10 +109,10 @@ python {baseDir}/scripts/ai_image.py run \
 
 | Option | Description |
 |--------|-------------|
-| `--model` | Model key: `nano-banana`, `nano-banana-pro`, `doubao-seedream-5-0-260128`, `gpt-image-2` (required) |
+| `--model` | Model key: `nano-banana`, `nano-banana-pro`, `doubao-seedream-5-0-260128`, `doubao-seedream-5-0-pro-260628`, `gpt-image-2` (required) |
 | `--prompt` | Text prompt describing the image (required) |
 | `--proportion` | Aspect ratio, e.g. `16:9`, `1:1`, `9:16` |
-| `--resolution` | `1k` / `2k` / `4k` — only for nano-banana/pro, do NOT pass for gpt-image-2 |
+| `--resolution` | Nano Banana/Seedream: `1k` / `2k` / `4k`; gpt-image-2: `auto` or `WIDTHxHEIGHT` (must meet dynamic-size constraints) |
 | `--input-images` | Local file path(s) for image-to-image (space-separated) |
 | `--count` | Number of images to generate (default: 1, max: 14). **When > 1, all tasks run in parallel** |
 | `--styles` | Custom styles for multi-image generation, space-separated. E.g. `--styles 写实 卡通 油画` |
@@ -118,7 +125,8 @@ python {baseDir}/scripts/ai_image.py run \
 | **Nano Banana** | Manual | `1k` / `2k` / `4k` (default: `1k`) |
 | **Nano Banana Pro** | Manual | `1k` / `2k` / `4k` (default: `1k`) |
 | **Seedream 5.0** | Manual | `1k` / `2k` / `4k` (default: `1k`) |
-| **gpt-image-2** | Auto (from proportion) | `1:1` → `4k`, `9:16` → `4k`, `16:9` → `4k` |
+| **Seedream 5.0 Pro** | Manual | `1k` / `2k` / `4k` (default: `1k`) |
+| **gpt-image-2** | Dynamic | `auto` or custom `WIDTHxHEIGHT`; max edge 3840px, 16px multiples, ratio ≤ 3:1, total 655,360–8,294,400px |
 
 ## Supported Proportions (per model)
 
@@ -127,6 +135,7 @@ python {baseDir}/scripts/ai_image.py run \
 | **Nano Banana** | `1:1` `9:16` `16:9` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `21:9` (10种) |
 | **Nano Banana Pro** | `1:1` `9:16` `16:9` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `21:9` (10种) |
 | **Seedream 5.0** | `1:1` `9:16` `16:9` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `21:9` (10种) |
+| **Seedream 5.0 Pro** | `1:1` `9:16` `16:9` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `21:9` (10种) |
 | **gpt-image-2** | `1:1` `9:16` `16:9` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `21:9` (10种) |
 
 ## Model Recommendation
@@ -136,4 +145,18 @@ python {baseDir}/scripts/ai_image.py run \
 | **Best overall (default)** | Nano Banana |
 | **Higher quality** | Nano Banana Pro |
 | **细节丰富/色彩鲜艳** | Seedream 5.0 |
+| **更高品质/复杂场景** | Seedream 5.0 Pro |
 | **Photo-realistic / art style** | gpt-image-2 |
+
+### gpt-image-2 Dynamic Size Reference
+
+`gpt-image-2` supports `auto` and custom pixel sizes. Common values are `1024x1024`, `2048x2048`, `1536x1024`, `2048x1152`, `3840x2160`, `1024x1536`, and `2160x3840`.
+
+Custom sizes must satisfy all constraints:
+
+- Width and height are at most `3840px`.
+- Both dimensions are multiples of `16px`.
+- The long-to-short edge ratio is no more than `3:1`.
+- Total pixels are between `655,360` and `8,294,400`.
+
+Sizes above `2560x1440` are experimental and should be validated with a small batch first.
