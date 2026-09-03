@@ -28,7 +28,7 @@ description: >
 SKILL.md                 ← 主技能入口（AI 读取）
 scripts/
   ai_image.py            ← 生图脚本
-  ai_video.py            ← 生视频脚本（MiniMax H3）
+  minimax_video.py       ← MiniMax H3 生视频脚本
   ai_audio.py            ← 文生音频和声音克隆脚本（MiniMax Speech 2.8）
   ai_search.py           ← 百度 AI 搜索脚本（支持 GET / POST）
   video_parse.py        ← 短视频解析脚本（提取视频直链）
@@ -36,7 +36,7 @@ scripts/
   shared/                ← 共享模块（config, client）
 references/
   ai_image.md            ← 生图参考文档
-  ai_video.md            ← 生视频参考文档
+  minimax_video.md       ← MiniMax H3 生视频参考文档
   ai_audio.md            ← 音频生成参考文档
   ai_search.md           ← 百度搜索参考文档
   video_parse.md        ← 短视频解析参考文档

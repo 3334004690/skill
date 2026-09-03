@@ -3,7 +3,7 @@
 Priority order:
 1. Environment variable AIMAXHUG_API_KEY  (CI / scripting)
 2. .env file in project root               (local development)
-3. Error — prompts user to create .env file
+3. Error — requires the user or administrator to configure the key
 """
 
 import os
@@ -36,8 +36,8 @@ def load_config() -> dict:
 
     print(
         "Error: API key not found.\n\n"
-        "Create .env file in the project root:\n"
-        '  echo AIMAXHUG_API_KEY=sk-xxx > .env\n\n'
+        "Please configure AIMAXHUG_API_KEY in the environment or project .env before running.\n"
+        "This script will not create .env, helper scripts, or prompt files.\n\n"
         "Get your API key at: https://api.aimaxhug.cloud\n",
         file=sys.stderr,
     )

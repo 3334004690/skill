@@ -2,7 +2,7 @@
 """Generate videos with the MiniMax H3 video API.
 
 The API is asynchronous: submit a JSON request to /v1/videos, then poll
-/v1/videos/{model}/{task_id} until a playable URL is available.
+/v1/videos/minimax-h3/{task_id} until a playable URL is available.
 Reference media may be public URLs, data URIs, or local files (encoded as
 data URIs by this script).
 """
@@ -12,6 +12,7 @@ import base64
 import os
 import json as json_mod
 import mimetypes
+import subprocess
 import sys
 import tempfile
 import time
@@ -28,6 +29,7 @@ from ai_audio import audio_duration
 VIDEO_ENDPOINT = "https://apis.aimaxhug.cloud/v1/videos"
 POLL_INTERVAL_FAST = 4
 POLL_INTERVAL_SLOW = 12
+DEFAULT_POLL_TIMEOUT = 20 * 60
 MAX_PROMPT_CHARS = 7_000
 MAX_REFERENCE_IMAGES = 5
 MAX_REFERENCE_AUDIOS = 3
@@ -84,7 +86,7 @@ def _duration_from_source(value, label):
     """Read duration for a local file, direct URL, or base64 data URI."""
     value = value.strip()
     if not value.startswith(("http://", "https://", "data:")):
-        return audio_duration(Path(value))
+        return _local_media_duration(Path(value), label)
 
     try:
         if value.startswith("data:"):
@@ -94,7 +96,7 @@ def _duration_from_source(value, label):
             mime_type = metadata[5:].split(";", 1)[0]
             content = base64.b64decode(encoded, validate=True)
             suffix = mimetypes.guess_extension(mime_type) or ".bin"
-            return _duration_from_bytes(content, suffix)
+            return _local_media_duration_from_bytes(content, suffix, label)
 
         response = requests.get(value, stream=True, timeout=60)
         response.raise_for_status()
@@ -109,9 +111,36 @@ def _duration_from_source(value, label):
             if total > MAX_DURATION_PROBE_BYTES:
                 raise ValueError("参考素材超过 100MB，无法预检时长")
             chunks.append(chunk)
-        return _duration_from_bytes(b"".join(chunks), suffix)
+        return _local_media_duration_from_bytes(b"".join(chunks), suffix, label)
     except (OSError, ValueError, requests.RequestException) as exc:
         raise ValueError(f"无法读取{label}时长: {exc}") from exc
+
+
+def _local_media_duration(path, label):
+    """Probe audio/video duration without creating user-visible files."""
+    if path.suffix.lower() in {".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi"}:
+        try:
+            completed = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
+                 "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
+                capture_output=True, text=True, timeout=30, check=True,
+            )
+            return float(completed.stdout.strip())
+        except (FileNotFoundError, subprocess.SubprocessError, ValueError) as exc:
+            raise ValueError(f"无法读取{label}时长，请安装 ffprobe 后重试") from exc
+    return audio_duration(path)
+
+
+def _local_media_duration_from_bytes(content, suffix, label):
+    """Probe an internal temporary file and remove it immediately."""
+    with tempfile.NamedTemporaryFile(suffix=suffix or ".bin", delete=False) as handle:
+        handle.write(content)
+        temp_path = Path(handle.name)
+    try:
+        return _local_media_duration(temp_path, label)
+    finally:
+        if temp_path.exists():
+            os.unlink(temp_path)
 
 
 def _validate_duration_constraints(args):
@@ -132,7 +161,9 @@ def build_body(model, prompt, duration=None, ratio=None, reference_images=None,
                reference_audios=None, reference_videos=None, first_image=None,
                last_image=None):
     """Build the MiniMax request body and omit optional values when absent."""
-    body = {"model": model, "prompt": prompt.strip()}
+    # The API silently truncates prompts beyond 7000 characters; mirror that
+    # behavior before submission so the request payload is deterministic.
+    body = {"model": model, "prompt": prompt.strip()[:MAX_PROMPT_CHARS]}
     if duration is not None:
         body["duration"] = duration
     if ratio:
@@ -159,20 +190,28 @@ def _nested_data(response):
 
 def _task_id(response):
     data = _nested_data(response)
-    return response.get("task_id") or response.get("taskId") or data.get("task_id") or data.get("taskId")
+    return (
+        response.get("task_id") or response.get("taskId") or response.get("id")
+        or data.get("task_id") or data.get("taskId") or data.get("id")
+    )
 
 
 def _video_url(response):
     data = _nested_data(response)
+    result = data.get("result") if isinstance(data.get("result"), dict) else {}
     return (
         response.get("video_url") or response.get("videoUrl") or response.get("url")
-        or data.get("video_url") or data.get("videoUrl") or data.get("url") or ""
+        or data.get("video_url") or data.get("videoUrl") or data.get("url")
+        or result.get("video_url") or result.get("videoUrl") or result.get("url") or ""
     )
 
 
 def _status(response):
     data = _nested_data(response)
-    return str(response.get("status") or data.get("status") or "").lower()
+    return str(
+        response.get("status") or response.get("task_status") or response.get("state")
+        or data.get("status") or data.get("task_status") or data.get("state") or ""
+    ).lower()
 
 
 def _error_message(response):
@@ -185,8 +224,6 @@ def _validate_args(args):
     prompt = args.prompt.strip()
     if not prompt:
         raise ValueError("prompt 不能为空")
-    if len(prompt) > MAX_PROMPT_CHARS:
-        raise ValueError(f"prompt 最多 {MAX_PROMPT_CHARS} 个字符，当前 {len(prompt)} 个；超出部分不会生效")
     if args.duration is not None and not 4 <= args.duration <= 15:
         raise ValueError("duration 必须为 4-15 秒")
     if args.ratio and args.ratio not in RATIOS:
@@ -237,25 +274,39 @@ def add_generate_args(parser):
                         help="Pro 专用参考视频 URL、data URI 或本地文件，只能 1 个")
     parser.add_argument("--first-image", default=None, help="首帧图 URL、data URI 或本地文件")
     parser.add_argument("--last-image", default=None, help="尾帧图 URL、data URI 或本地文件")
-    parser.add_argument("--poll-timeout", type=int, default=900, help="最长等待秒数（默认 900）")
+    parser.add_argument("--poll-timeout", type=int, default=DEFAULT_POLL_TIMEOUT,
+                        help="最长轮询等待秒数（默认 1200，即 20 分钟）")
     parser.add_argument("--json", action="store_true", help="以 JSON 格式输出结果")
 
 
 def _submit_and_wait(client, body, poll_timeout):
     response = client.post(VIDEO_ENDPOINT, json=body, timeout=120)
+    if response.get("success") is False or _status(response) in {"failed", "failure", "error"}:
+        raise AimaxhugError(_error_message(response))
     direct_url = _video_url(response)
     task_id = _task_id(response)
     if direct_url:
+        if task_id:
+            print(f"✅ 任务已提交，任务 ID: {task_id}", file=sys.stderr)
         return response, direct_url, task_id
     if not task_id:
         raise AimaxhugError(f"提交成功但响应中没有 task_id: {_error_message(response)}")
 
-    status_endpoint = f"{VIDEO_ENDPOINT}/{body['model']}/{task_id}"
+    # The gateway uses the shared MiniMax H3 family route for all four models.
+    status_endpoint = f"{VIDEO_ENDPOINT}/minimax-h3/{task_id}"
     started = time.monotonic()
+    poll_count = 0
+    print(f"✅ 任务已提交，任务 ID: {task_id}", file=sys.stderr)
     while time.monotonic() - started < poll_timeout:
+        poll_count += 1
         status_response = client.get(status_endpoint, timeout=120)
         status = _status(status_response)
         direct_url = _video_url(status_response)
+        nested = _nested_data(status_response)
+        progress = nested.get("progress") if "progress" in nested else status_response.get("progress")
+        progress_text = f"，进度 {progress}%" if progress is not None else ""
+        elapsed = int(time.monotonic() - started)
+        print(f"⏳ 任务 {task_id}：第 {poll_count} 次轮询，状态 {status or 'processing'}{progress_text}（已等待 {elapsed} 秒）", file=sys.stderr)
         if direct_url or status in {"completed", "complete", "succeeded", "success", "done"}:
             if not direct_url:
                 raise AimaxhugError("任务已完成但响应中没有视频 URL")
@@ -304,7 +355,7 @@ def cmd_run(args):
         "video_url": video_url,
         "task_id": task_id or _task_id(response),
         "model": args.model,
-        "prompt": args.prompt,
+        "prompt": body["prompt"],
         "duration": args.duration,
         "ratio": args.ratio,
         "mode": mode,

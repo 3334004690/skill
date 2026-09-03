@@ -14,22 +14,24 @@
 ## API Workflow
 
 1. Submit `POST https://apis.aimaxhug.cloud/v1/videos` with JSON body and Bearer authentication.
-2. Read `task_id` from the response.
-3. Poll `GET https://apis.aimaxhug.cloud/v1/videos/{model}/{task_id}` until status is completed and `video_url` is returned.
+2. Read and immediately report `task_id` from the response.
+3. Poll `GET https://apis.aimaxhug.cloud/v1/videos/minimax-h3/{task_id}` until status is completed and `video_url` is returned.
 
-The script performs this workflow automatically.
+The predefined script performs all validation and polling. It never creates `.env`, prompt files, helper scripts, or alternate video-generation scripts at runtime. Any validation or API error stops the request before generation.
 
 ## CLI Usage
 
 ```bash
-python {baseDir}/scripts/ai_video.py list-models
-python {baseDir}/scripts/ai_video.py run [options]
+python {baseDir}/scripts/minimax_video.py list-models
+python {baseDir}/scripts/minimax_video.py run [options]
 ```
+
+默认最多轮询等待 20 分钟（1200 秒）；可通过 `--poll-timeout` 自定义等待时间。
 
 ### Text-to-Video
 
 ```bash
-python {baseDir}/scripts/ai_video.py run \
+python {baseDir}/scripts/minimax_video.py run \
   --model minimax-h3-768p \
   --prompt "清晨的海浪涌向沙滩，金色阳光映照水面，电影感镜头" \
   --duration 5 \
@@ -39,7 +41,7 @@ python {baseDir}/scripts/ai_video.py run \
 ### Image-to-Video
 
 ```bash
-python {baseDir}/scripts/ai_video.py run \
+python {baseDir}/scripts/minimax_video.py run \
   --model minimax-h3-2k \
   --prompt "人物自然转身，镜头缓慢推进" \
   --reference-images image1.jpg image2.jpg \
@@ -51,7 +53,7 @@ python {baseDir}/scripts/ai_video.py run \
 ### First/Last Frame
 
 ```bash
-python {baseDir}/scripts/ai_video.py run \
+python {baseDir}/scripts/minimax_video.py run \
   --model minimax-h3-2k \
   --prompt "花朵从含苞到盛开，画面自然过渡" \
   --first-image start.jpg \
@@ -63,7 +65,7 @@ python {baseDir}/scripts/ai_video.py run \
 ### Reference-Video Driven
 
 ```bash
-python {baseDir}/scripts/ai_video.py run \
+python {baseDir}/scripts/minimax_video.py run \
   --model minimax-h3-pro-768p \
   --prompt "保持人物动作节奏，改为电影级暖色调" \
   --reference-videos source.mp4 \
@@ -76,16 +78,17 @@ python {baseDir}/scripts/ai_video.py run \
 | CLI option | API field | Constraint |
 |------------|-----------|------------|
 | `--model` | `model` | One of the four model keys above |
-| `--prompt` | `prompt` | Required; at most 7000 characters |
+| `--prompt` | `prompt` | Required; API silently truncates text beyond 7000 characters |
 | `--duration` | `duration` | Optional; integer from 4 to 15 seconds |
 | `--ratio` | `ratio` | `16:9`, `9:16`, `1:1`, `21:9`, `4:3`, `3:4`, or `adaptive` |
 | `--reference-images` | `referenceImages` | Up to 5 URLs, data URIs, or local files |
 | `--reference-audios` | `referenceAudios` | Up to 3; requires `referenceImages` |
-| `--reference-videos` | `referenceVideos` | Pro models only; exactly one source video |
+| `--reference-videos` | `referenceVideos` | Pro models only; exactly one 2-5 second source video |
 | `--first-image` | `first_image` | Cannot be combined with `referenceImages` |
 | `--last-image` | `last_image` | Cannot be combined with `referenceImages` |
+| `--poll-timeout` | client-side polling limit | Defaults to 1200 seconds (20 minutes) |
 
-Local files are automatically encoded as `data:<mime>;base64,...`. Public URLs must be directly accessible.
+Local files are automatically encoded as `data:<mime>;base64,...`. Public URLs must be directly accessible. The script probes reference-media duration before submission and stops if it cannot verify the documented limits.
 
 ## Validation Rules
 
@@ -93,5 +96,5 @@ Local files are automatically encoded as `data:<mime>;base64,...`. Public URLs m
 - `first_image` / `last_image` and `referenceImages` are mutually exclusive.
 - Reference audio must be supplied together with reference images; provide at most three audio files and keep their total duration within 15 seconds.
 - Reference video is available only to Pro models and must be one 2-5 second source video.
-- 2K and reference-video requests can take longer during peak periods. Retry a request that remains queued or fails transiently.
+- 2K and reference-video requests can take longer during peak periods; keep polling until completion or timeout.
 - Content policy is enforced by the API. Disallowed prompts fail with HTTP 400 before a task is created or billed.
