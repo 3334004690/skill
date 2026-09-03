@@ -1,457 +1,342 @@
 #!/usr/bin/env python3
-"""Generate videos using Aimaxhug API (Kling / Vidu).
+"""Generate videos with the MiniMax H3 video API.
 
-三种模式：
-  文生视频      — 仅传 --prompt（不传 --input-images）
-  图生视频      — 传 --prompt + --input-images（图片文件）
-  视频生视频    — 传 --prompt + --input-images（视频文件，消耗巨大，谨慎使用）
-
-## AGENT INSTRUCTIONS — READ FIRST
-- Default flow: ALWAYS use `run` (generate + show result).
-- Before generating, show `list-models` so user can choose model/params.
-- Do NOT pick a model for the user — show the table and let them choose.
-- Multi-video (--count > 1): tasks run in parallel automatically.
-  Do NOT run multi-video tasks sequentially — use --count and let the script parallelize.
-- 视频生视频消耗巨大，务必提前告知用户并确认。
-  ️检测到输入文件中有视频时自动弹出警告，不要自行决定。
-
-Subcommands:
-    run           Generate videos — DEFAULT
-    list-models   Show supported models and parameter constraints
-
-Usage:
-    # 文生视频
-    python ai_video.py run --model kling --prompt "..." --proportion 16:9 --resolution 720p
-
-    # 图生视频
-    python ai_video.py run --model vidu --prompt "..." --input-images photo.jpg --proportion 9:16
-
-    # 视频生视频（消耗巨大）
-    python ai_video.py run --model kling --prompt "..." --input-images video.mp4 --proportion 16:9
-
-    # Multi-video parallel
-    python ai_video.py run --model kling --prompt "..." --count 3 --proportion 16:9
-
-    # List models
-    python ai_video.py list-models
+The API is asynchronous: submit a JSON request to /v1/videos, then poll
+/v1/videos/{model}/{task_id} until a playable URL is available.
+Reference media may be public URLs, data URIs, or local files (encoded as
+data URIs by this script).
 """
 
 import argparse
+import base64
+import os
 import json as json_mod
 import mimetypes
-import os
 import sys
 import tempfile
 import time
-from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
+from urllib.parse import urlparse
 
 import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from shared.client import AimaxhugClient, AimaxhugError
+from ai_audio import audio_duration
 
-VIDEO_ENDPOINT = "/api/v2/video-tencentcloud/vidu-kling-seedance"
-UPLOAD_ENDPOINT = "/api/v2/upload/file"
-
-AUTO_PROMPTS = [
-    " cinematic quality",
-    " dramatic lighting",
-    " close-up shot",
-    " wide angle view",
-    " slow motion effect",
-]
-
-# ---------------------------------------------------------------------------
-# Model registry
-# ---------------------------------------------------------------------------
+VIDEO_ENDPOINT = "https://apis.aimaxhug.cloud/v1/videos"
+POLL_INTERVAL_FAST = 4
+POLL_INTERVAL_SLOW = 12
+MAX_PROMPT_CHARS = 7_000
+MAX_REFERENCE_IMAGES = 5
+MAX_REFERENCE_AUDIOS = 3
+MAX_REFERENCE_VIDEOS = 1
+MAX_DURATION_PROBE_BYTES = 100 * 1024 * 1024
 
 VIDEO_MODELS = {
-    "kling": {
-        "api_model": "kling",
-        "name": "可灵 (Kling)",
-        "desc": "快手可灵 AI 视频生成，支持 1080p/4k 分辨率",
-        "proportions": ["16:9", "9:16", "1:1"],
-        "durations": ["5", "10", "15"],
-        "resolutions": ["720p", "1080p", "4k"],
-        "default_duration": "5",
-        "default_resolution": "720p",
-    },
-    "vidu": {
-        "api_model": "vidu",
-        "name": "Vidu",
-        "desc": "Vidu AI 视频生成，支持首尾帧控制",
-        "proportions": ["16:9", "9:16", "1:1"],
-        "durations": ["5", "10", "15"],
-        "resolutions": ["720p", "1080p"],
-        "default_duration": "5",
-        "default_resolution": "720p",
-    },
+    "minimax-h3-768p": {"name": "MiniMax H3 768p", "tier": "standard"},
+    "minimax-h3-2k": {"name": "MiniMax H3 2K", "tier": "standard"},
+    "minimax-h3-pro-768p": {"name": "MiniMax H3 Pro 768p", "tier": "pro"},
+    "minimax-h3-pro-2k": {"name": "MiniMax H3 Pro 2K", "tier": "pro"},
 }
 
-
-# ---------------------------------------------------------------------------
-# Helpers
-# ---------------------------------------------------------------------------
+RATIOS = ("16:9", "9:16", "1:1", "21:9", "4:3", "3:4", "adaptive")
 
 
-def upload_file(client, file_path):
-    """Upload a single file and return data dict {tmp_url, name, type, size}."""
-    path = Path(file_path)
-    if not path.exists():
-        print(f"Error: 文件不存在: {file_path}", file=sys.stderr)
-        sys.exit(1)
+def _media_value(value):
+    """Return a public URL/data URI unchanged, or encode a local file."""
+    value = value.strip()
+    if value.startswith(("http://", "https://", "data:")):
+        return value
 
+    path = Path(value)
+    if not path.exists() or not path.is_file():
+        raise ValueError(f"参考素材不存在: {value}")
     mime_type, _ = mimetypes.guess_type(path.name)
-    if not mime_type:
-        mime_type = "application/octet-stream"
-
-    print(f"📤 上传中: {path.name}...", file=sys.stderr)
-    data = client.post_file(UPLOAD_ENDPOINT, str(path), mime_type)
-    print(f"   ✅ URL: [点击预览]({data['tmp_url']})", file=sys.stderr)
-    return data
+    mime_type = mime_type or "application/octet-stream"
+    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
+    return f"data:{mime_type};base64,{encoded}"
 
 
-def _ensure_direct_url(client, video_url):
-    """Download video and re-upload to ensure a directly displayable URL.
-
-    Some returned video URLs serve streams that can't be embedded inline.
-    Re-uploading via the upload endpoint guarantees a universally accessible URL.
-    """
+def _media_values(values, label):
+    if not values:
+        return []
     try:
-        resp = requests.get(video_url, timeout=120, stream=True)
-        ct = (resp.headers.get("Content-Type") or "").split(";")[0].strip()
-        if not ct.startswith("video/"):
-            return video_url
-
-        ext = mimetypes.guess_extension(ct) or ".mp4"
-        with tempfile.NamedTemporaryFile(suffix=ext, delete=False) as tmp:
-            tmp.write(resp.content)
-            tmp_path = tmp.name
-        try:
-            print(f"  📤 重新上传视频以确保可直接播放...", file=sys.stderr)
-            data = client.post_file(UPLOAD_ENDPOINT, tmp_path, ct)
-            return data.get("tmp_url", video_url)
-        finally:
-            if os.path.exists(tmp_path):
-                os.unlink(tmp_path)
-    except Exception:
-        return video_url
+        return [_media_value(value) for value in values]
+    except (OSError, ValueError) as exc:
+        raise ValueError(f"{label}无效: {exc}") from exc
 
 
-def build_body(model, prompt, proportion, duration, resolution, input_data):
-    """Build request body for video generation."""
-    body = {
-        "prompt": prompt.strip(),
-        "model": model["api_model"],
-    }
+def _duration_from_bytes(content, suffix):
+    """Read media duration from bytes through the shared local-file reader."""
+    with tempfile.NamedTemporaryFile(suffix=suffix or ".bin", delete=False) as handle:
+        handle.write(content)
+        temp_path = Path(handle.name)
+    try:
+        return audio_duration(temp_path)
+    finally:
+        if temp_path.exists():
+            os.unlink(temp_path)
 
-    body["images"] = input_data if input_data else []
 
-    body["duration"] = duration or model["default_duration"]
-    body["aspect_ratio"] = proportion or "16:9"
-    body["resolution"] = resolution or model["default_resolution"]
+def _duration_from_source(value, label):
+    """Read duration for a local file, direct URL, or base64 data URI."""
+    value = value.strip()
+    if not value.startswith(("http://", "https://", "data:")):
+        return audio_duration(Path(value))
 
+    try:
+        if value.startswith("data:"):
+            metadata, encoded = value.split(",", 1)
+            if ";base64" not in metadata:
+                raise ValueError("data URI 必须使用 base64 编码")
+            mime_type = metadata[5:].split(";", 1)[0]
+            content = base64.b64decode(encoded, validate=True)
+            suffix = mimetypes.guess_extension(mime_type) or ".bin"
+            return _duration_from_bytes(content, suffix)
+
+        response = requests.get(value, stream=True, timeout=60)
+        response.raise_for_status()
+        content_type = (response.headers.get("Content-Type") or "").split(";", 1)[0]
+        suffix = Path(urlparse(value).path).suffix or mimetypes.guess_extension(content_type) or ".bin"
+        chunks = []
+        total = 0
+        for chunk in response.iter_content(chunk_size=1024 * 1024):
+            if not chunk:
+                continue
+            total += len(chunk)
+            if total > MAX_DURATION_PROBE_BYTES:
+                raise ValueError("参考素材超过 100MB，无法预检时长")
+            chunks.append(chunk)
+        return _duration_from_bytes(b"".join(chunks), suffix)
+    except (OSError, ValueError, requests.RequestException) as exc:
+        raise ValueError(f"无法读取{label}时长: {exc}") from exc
+
+
+def _validate_duration_constraints(args):
+    audio_durations = [
+        _duration_from_source(value, "参考音频")
+        for value in (args.reference_audios or [])
+    ]
+    if sum(audio_durations) > 15:
+        raise ValueError(f"参考音频总时长不能超过 15 秒，当前为 {sum(audio_durations):.2f} 秒")
+
+    for value in args.reference_videos or []:
+        duration = _duration_from_source(value, "参考视频")
+        if not 2 <= duration <= 5:
+            raise ValueError(f"参考视频时长必须为 2-5 秒，当前为 {duration:.2f} 秒")
+
+
+def build_body(model, prompt, duration=None, ratio=None, reference_images=None,
+               reference_audios=None, reference_videos=None, first_image=None,
+               last_image=None):
+    """Build the MiniMax request body and omit optional values when absent."""
+    body = {"model": model, "prompt": prompt.strip()}
+    if duration is not None:
+        body["duration"] = duration
+    if ratio:
+        body["ratio"] = ratio
+    if reference_images:
+        body["referenceImages"] = reference_images
+    if reference_audios:
+        body["referenceAudios"] = reference_audios
+    if reference_videos:
+        body["referenceVideos"] = reference_videos
+    if first_image:
+        body["first_image"] = first_image
+    if last_image:
+        body["last_image"] = last_image
     return body
 
 
-def generate_one(client, model, body, index, total):
-    """Generate a single video. Returns dict with success/video_url/prompt."""
-    try:
-        data = client.post(VIDEO_ENDPOINT, json=body)
-    except AimaxhugError as e:
-        return {"success": False, "error": str(e), "index": index}
-
-    biz_code = data.get("code") or data.get("status")
-    if biz_code and biz_code != 200:
-        return {
-            "success": False,
-            "error": data.get("message", f"后端返回错误码 {biz_code}"),
-            "index": index,
-        }
-
-    video_url = data.get("data", {}).get("url") or data.get("data", {}).get("videoUrl", "")
-    if not video_url:
-        return {"success": False, "error": "返回数据中没有视频地址", "index": index}
-
-    # Re-upload so the video plays inline regardless of source URL type
-    video_url = _ensure_direct_url(client, video_url)
-
-    print(f"  ✅ [{index}/{total}] 生成完成", file=sys.stderr)
-
-    return {
-        "success": True,
-        "video_url": video_url,
-        "prompt": body.get("prompt", ""),
-        "index": index,
-    }
+def _nested_data(response):
+    if not isinstance(response, dict):
+        return {}
+    data = response.get("data")
+    return data if isinstance(data, dict) else response
 
 
-# ---------------------------------------------------------------------------
-# Subcommand: list-models
-# ---------------------------------------------------------------------------
+def _task_id(response):
+    data = _nested_data(response)
+    return response.get("task_id") or response.get("taskId") or data.get("task_id") or data.get("taskId")
 
 
-def cmd_list_models(args):
-    """Print video model table with all parameters."""
-    print()
-    print("=" * 100)
-    print("🎬 可用视频生成模型 — 请选择并告诉我以下参数")
-    print("=" * 100)
-
-    header = f"{'模型名称':<20} {'模型Key':<10} {'分辨率':<24} {'时长':<16} {'支持比例'}"
-    sep = "─" * 100
-    print(f"\n{header}")
-    print(sep)
-
-    for key, m in VIDEO_MODELS.items():
-        res = " / ".join(m["resolutions"])
-        dur = " / ".join(f"{d}秒" for d in m["durations"])
-        props = " / ".join(m["proportions"])
-        print(f"{m['name']:<20} {key:<10} {res:<24} {dur:<16} {props}")
-
-    print(sep)
-    print()
-
-    for key, m in VIDEO_MODELS.items():
-        print(f"  [{key}] {m['name']} — {m['desc']}")
-        print(f"      支持比例: {' / '.join(m['proportions'])}")
-        print(f"      时长: {' / '.join(f'{d}秒' for d in m['durations'])}（默认 {m['default_duration']}秒）")
-        print(f"      分辨率: {' / '.join(m['resolutions'])}（默认 {m['default_resolution']}）")
-        if m["api_model"] == "vidu":
-            print(f"      ⚠️  4k 分辨率仅可灵支持，Vidu 不支持")
-        print(f"      ⚠️  传入参考素材（图生视频）时不支持 15 秒，仅 5-10 秒")
-        print()
-
-    print("支持三种模式:")
-    print("  文生视频   — 仅传提示词（默认）")
-    print("  图生视频   — 传提示词 + 参考图片")
-    print("  视频生视频 — 传提示词 + 参考视频（⚠️ 消耗巨大，谨慎使用）")
-    print()
-    print("请选择模型并告诉我：提示词、模式、比例、时长、分辨率（如适用）")
-    print("=" * 100)
-    print()
+def _video_url(response):
+    data = _nested_data(response)
+    return (
+        response.get("video_url") or response.get("videoUrl") or response.get("url")
+        or data.get("video_url") or data.get("videoUrl") or data.get("url") or ""
+    )
 
 
-# ---------------------------------------------------------------------------
-# Subcommand: run (generate)
-# ---------------------------------------------------------------------------
+def _status(response):
+    data = _nested_data(response)
+    return str(response.get("status") or data.get("status") or "").lower()
 
 
-def add_generate_args(p):
-    p.add_argument("--model", default="kling",
-                   choices=list(VIDEO_MODELS.keys()),
-                   help="模型 key（默认: kling）")
-    p.add_argument("--prompt", required=True,
-                   help="提示词：描述你要生成的视频内容")
-    p.add_argument("--proportion", default=None,
-                   help="画面比例，如 16:9、9:16、1:1 等")
-    p.add_argument("--duration", default=None,
-                   help="视频时长: 5、10、15（秒）")
-    p.add_argument("--resolution", default=None,
-                   help="分辨率: 720p/1080p/4k")
-    p.add_argument("--input-images", nargs="+", default=None,
-                   help="参考素材路径（传图=图生视频，传视频=视频生视频，不传=文生视频）")
-    p.add_argument("--count", type=int, default=1,
-                   help="生成数量（默认 1，>1 时自动并行）")
-    p.add_argument("--json", action="store_true",
-                   help="以 JSON 格式输出结果")
-    return p
+def _error_message(response):
+    data = _nested_data(response)
+    return response.get("message") or data.get("message") or response.get("error") or data.get("error") or "未知错误"
+
+
+def _validate_args(args):
+    model = VIDEO_MODELS[args.model]
+    prompt = args.prompt.strip()
+    if not prompt:
+        raise ValueError("prompt 不能为空")
+    if len(prompt) > MAX_PROMPT_CHARS:
+        raise ValueError(f"prompt 最多 {MAX_PROMPT_CHARS} 个字符，当前 {len(prompt)} 个；超出部分不会生效")
+    if args.duration is not None and not 4 <= args.duration <= 15:
+        raise ValueError("duration 必须为 4-15 秒")
+    if args.ratio and args.ratio not in RATIOS:
+        raise ValueError(f"ratio 必须是: {' / '.join(RATIOS)}")
+
+    image_count = len(args.reference_images or [])
+    audio_count = len(args.reference_audios or [])
+    video_count = len(args.reference_videos or [])
+    if image_count > MAX_REFERENCE_IMAGES:
+        raise ValueError("referenceImages 最多 5 个")
+    if audio_count > MAX_REFERENCE_AUDIOS:
+        raise ValueError("referenceAudios 最多 3 个")
+    if video_count > MAX_REFERENCE_VIDEOS:
+        raise ValueError("referenceVideos 只能传 1 段")
+    if audio_count and not image_count:
+        raise ValueError("referenceAudios 必须同时提供 referenceImages")
+    if video_count and model["tier"] != "pro":
+        raise ValueError("referenceVideos 仅 Pro 模型支持")
+    if (args.first_image or args.last_image) and args.reference_images:
+        raise ValueError("first_image/last_image 不能与 referenceImages 同时使用")
+    if args.last_image and not args.first_image:
+        raise ValueError("使用 last_image 时必须同时提供 first_image")
+    if not image_count and not args.first_image and args.ratio == "adaptive":
+        raise ValueError("文生视频不支持 ratio=adaptive")
+    _validate_duration_constraints(args)
+
+
+def cmd_list_models(_args):
+    print("可用 MiniMax 视频模型：")
+    for key, model in VIDEO_MODELS.items():
+        pro_note = "（Pro，支持参考视频）" if model["tier"] == "pro" else ""
+        print(f"  [{key}] {model['name']} {pro_note}")
+    print("\n通用参数：duration 4-15 秒；ratio: 16:9 / 9:16 / 1:1 / 21:9 / 4:3 / 3:4 / adaptive")
+    print("参考图最多 5 张，参考音频最多 3 个（须配图），参考视频仅 Pro 且只能 1 段。")
+
+
+def add_generate_args(parser):
+    parser.add_argument("--model", choices=list(VIDEO_MODELS), default="minimax-h3-768p",
+                        help="MiniMax 模型 key（默认: minimax-h3-768p）")
+    parser.add_argument("--prompt", required=True, help="视频提示词，最多 7000 字符")
+    parser.add_argument("--duration", type=int, default=None, help="视频时长，4-15 秒")
+    parser.add_argument("--ratio", choices=RATIOS, default=None, help="画幅比例")
+    parser.add_argument("--reference-images", nargs="+", default=None,
+                        help="参考图 URL、data URI 或本地文件，最多 5 个")
+    parser.add_argument("--reference-audios", nargs="+", default=None,
+                        help="参考音频 URL、data URI 或本地文件，最多 3 个且须配参考图")
+    parser.add_argument("--reference-videos", nargs="+", default=None,
+                        help="Pro 专用参考视频 URL、data URI 或本地文件，只能 1 个")
+    parser.add_argument("--first-image", default=None, help="首帧图 URL、data URI 或本地文件")
+    parser.add_argument("--last-image", default=None, help="尾帧图 URL、data URI 或本地文件")
+    parser.add_argument("--poll-timeout", type=int, default=900, help="最长等待秒数（默认 900）")
+    parser.add_argument("--json", action="store_true", help="以 JSON 格式输出结果")
+
+
+def _submit_and_wait(client, body, poll_timeout):
+    response = client.post(VIDEO_ENDPOINT, json=body, timeout=120)
+    direct_url = _video_url(response)
+    task_id = _task_id(response)
+    if direct_url:
+        return response, direct_url, task_id
+    if not task_id:
+        raise AimaxhugError(f"提交成功但响应中没有 task_id: {_error_message(response)}")
+
+    status_endpoint = f"{VIDEO_ENDPOINT}/{body['model']}/{task_id}"
+    started = time.monotonic()
+    while time.monotonic() - started < poll_timeout:
+        status_response = client.get(status_endpoint, timeout=120)
+        status = _status(status_response)
+        direct_url = _video_url(status_response)
+        if direct_url or status in {"completed", "complete", "succeeded", "success", "done"}:
+            if not direct_url:
+                raise AimaxhugError("任务已完成但响应中没有视频 URL")
+            return status_response, direct_url, task_id
+        if status in {"failed", "failure", "error", "cancelled", "canceled"}:
+            raise AimaxhugError(_error_message(status_response))
+        elapsed = time.monotonic() - started
+        time.sleep(POLL_INTERVAL_FAST if elapsed < 60 else POLL_INTERVAL_SLOW)
+
+    raise AimaxhugError(f"视频生成超时，已等待 {poll_timeout} 秒，task_id={task_id}")
 
 
 def cmd_run(args):
-    """Generate video(s) and print result. Multi-video runs in parallel."""
-    model = VIDEO_MODELS.get(args.model)
-    if not model:
-        print(f"Error: 未知模型: {args.model}", file=sys.stderr)
+    try:
+        _validate_args(args)
+        reference_images = _media_values(args.reference_images, "参考图")
+        reference_audios = _media_values(args.reference_audios, "参考音频")
+        reference_videos = _media_values(args.reference_videos, "参考视频")
+        first_image = _media_value(args.first_image) if args.first_image else None
+        last_image = _media_value(args.last_image) if args.last_image else None
+        body = build_body(args.model, args.prompt, args.duration, args.ratio, reference_images,
+                          reference_audios, reference_videos, first_image, last_image)
+    except ValueError as exc:
+        print(f"Error: {exc}", file=sys.stderr)
         sys.exit(1)
-
-    proportion = args.proportion
-    duration = args.duration
-    resolution = args.resolution
-    count = args.count or 1
-
-    MAX_COUNT = 5
-    if count > MAX_COUNT:
-        print(f"Error: 最多一次性生成 {MAX_COUNT} 个视频，当前设置 {count}", file=sys.stderr)
-        sys.exit(1)
-
-    model_props = model.get("proportions")
-    if proportion and proportion not in model_props:
-        print(f"Error: {model['name']} 不支持比例 {proportion}", file=sys.stderr)
-        print(f"   该模型支持: {' / '.join(model_props)}", file=sys.stderr)
-        sys.exit(1)
-
-    if duration and duration not in model["durations"]:
-        print(f"Error: {model['name']} 不支持的时长: {duration}秒", file=sys.stderr)
-        print(f"   可选: {' / '.join(f'{d}秒' for d in model['durations'])}", file=sys.stderr)
-        sys.exit(1)
-
-    if resolution and resolution not in model["resolutions"]:
-        print(f"Error: {model['name']} 不支持的分辨率: {resolution}", file=sys.stderr)
-        print(f"   可选: {' / '.join(model['resolutions'])}", file=sys.stderr)
-        sys.exit(1)
-
-    # --- Compatibility warnings (not blocking, but inform user) ---
-    has_input_images = bool(args.input_images)
-    if has_input_images and duration == "15":
-        print(f"⚠️ 提示: {model['name']} 传入参考素材时不支持 15 秒时长，仅支持 5-10 秒。", file=sys.stderr)
-        print(f"   当前仍按 15 秒请求，如失败请换用 5 秒或 10 秒。", file=sys.stderr)
-    if model["api_model"] == "vidu" and resolution == "4k":
-        print(f"⚠️ 提示: Vidu 不支持 4k 分辨率，仅支持 720p / 1080p。", file=sys.stderr)
-        print(f"   当前仍按 4k 请求，如失败请换用 720p 或 1080p。", file=sys.stderr)
-
-    input_data = None
-    has_video_ref = False
-    if args.input_images:
-        input_data = []
-        for path in args.input_images:
-            data = upload_file(AimaxhugClient(), path)
-            input_data.append(data)
-            if data.get("type", "").startswith("video/"):
-                has_video_ref = True
-
-    # --- 视频生视频警告 ---
-    if has_video_ref:
-        print(file=sys.stderr)
-        print("⚠️ ⚠️ ⚠️  警告：视频生视频模式  ⚠️ ⚠️ ⚠️", file=sys.stderr)
-        print("   检测到输入文件中包含视频，将使用「视频生视频」模式。", file=sys.stderr)
-        print("   此模式消耗巨大，生成时间可能显著延长。", file=sys.stderr)
-        print("   请确认是否继续。", file=sys.stderr)
-        print(file=sys.stderr)
-
-    if count == 1:
-        prompts = [args.prompt]
-    else:
-        prompts = [args.prompt]
-        for i in range(1, count):
-            s = AUTO_PROMPTS[(i - 1) % len(AUTO_PROMPTS)]
-            prompts.append(f"{args.prompt}{s}")
 
     client = AimaxhugClient()
-    bodies = []
-    for prompt in prompts:
-        body = build_body(model, prompt, proportion, duration, resolution, input_data)
-        bodies.append(body)
+    has_references = bool(reference_images or reference_audios or reference_videos or first_image or last_image)
+    mode = "文生视频"
+    if reference_videos:
+        mode = "参考视频驱动"
+    elif first_image or last_image:
+        mode = "首尾帧"
+    elif has_references:
+        mode = "图生视频"
+    print(f"🎬 正在使用 {args.model} 进行{mode}，提交任务并等待完成...", file=sys.stderr)
 
-    if count == 1:
-        mode_label = "文生视频" if not input_data else ("视频生视频" if has_video_ref else "图生视频")
-        print(f"🎬 正在使用 {model['name']} 进行{mode_label}（通常需要 1-3 分钟）", file=sys.stderr)
-        result = generate_one(client, model, bodies[0], 1, 1)
-        _display_results([(0, result)], model, proportion, duration, resolution, input_data, args.json)
+    try:
+        response, video_url, task_id = _submit_and_wait(client, body, args.poll_timeout)
+    except AimaxhugError as exc:
+        print(f"Error: 视频生成失败: {exc}", file=sys.stderr)
+        sys.exit(1)
+
+    result = {
+        "success": True,
+        "video_url": video_url,
+        "task_id": task_id or _task_id(response),
+        "model": args.model,
+        "prompt": args.prompt,
+        "duration": args.duration,
+        "ratio": args.ratio,
+        "mode": mode,
+    }
+    if args.json:
+        print(json_mod.dumps(result, ensure_ascii=False, indent=2))
     else:
-        mode_label = "文生视频" if not input_data else ("视频生视频" if has_video_ref else "图生视频")
-        print(f"🎬 正在使用 {model['name']} 并行生成 {count} 个{mode_label}...", file=sys.stderr)
-        results = []
-        with ThreadPoolExecutor(max_workers=min(count, 5)) as pool:
-            futures = {
-                pool.submit(generate_one, client, model, body, i + 1, count): i
-                for i, body in enumerate(bodies)
-            }
-            for future in as_completed(futures):
-                idx = futures[future]
-                r = future.result()
-                results.append((idx, r))
-                if r["success"]:
-                    print(f"  ✅ [{idx + 1}/{count}] 完成", file=sys.stderr)
-                else:
-                    print(f"  ❌ [{idx + 1}/{count}] 失败: {r.get('error')}", file=sys.stderr)
-
-        results.sort(key=lambda x: x[0])
-        _display_results(results, model, proportion, duration, resolution, input_data, args.json)
-
-
-def _display_results(results, model, proportion, duration, resolution, input_data, json_output):
-    """Display generation results."""
-    successes = [r for _, r in results if r["success"]]
-    failures = [r for _, r in results if not r["success"]]
-    total = len(results)
-
-    if json_output:
-        output = []
-        for _, r in results:
-            output.append({
-                "success": r["success"],
-                "video_url": r.get("video_url", ""),
-                "error": r.get("error", ""),
-                "prompt": r.get("prompt", ""),
-                "model": model["name"],
-                "api_model": model["api_model"],
-                "proportion": proportion,
-                "duration": duration or model["default_duration"],
-                "resolution": resolution or model["default_resolution"],
-            })
-        print(json_mod.dumps(output, indent=2, ensure_ascii=False))
-        return
-
-    # Text output
-    print()
-    mode_label = "文生视频"
-    if input_data:
-        mode_label = "视频生视频" if any(d.get("type", "").startswith("video/") for d in input_data) else "图生视频"
-
-    if total == 1 and successes:
-        r = successes[0]
-        print("✅ 生成成功！")
-        print("━" * 40)
-        print(f"  📍 {r['video_url']}")
-        print(f"  🎬  ![]({r['video_url']})")
-        print("━" * 40)
-        print(f"  📐 比例: {proportion or '16:9'}")
-        print(f"  ⏱  时长: {duration or model['default_duration']}秒")
-        print(f"  🔍 分辨率: {resolution or model['default_resolution']}")
-        print(f"  🤖 模型: {model['name']}")
-        print(f"  📋 模式: {mode_label}")
-    elif successes:
-        print(f"✅ 全部生成完成！（共 {total} 个视频）")
-        print(f"🤖 模型: {model['name']}")
-        print(f"📐 比例: {proportion or '16:9'}")
-        print(f"⏱  时长: {duration or model['default_duration']}秒")
-        print(f"🔍 分辨率: {resolution or model['default_resolution']}")
-        print(f"📋 模式: {mode_label}")
-        print()
-        for i, r in enumerate(successes):
-            print(f"━━━ [{i + 1}/{total}] ━━━")
-            print(f"  📍 {r['video_url']}")
-            print(f"  🎬  ![]({r['video_url']})")
-            print()
-
-    if failures:
-        print(f"\n⚠️ {len(failures)} 个视频生成失败:")
-        for r in failures:
-            print(f"  [{r['index']}] {r.get('error', '未知错误')}")
-
-    if input_data:
-        print(f"\n📎 参考图:")
-        for i, img in enumerate(input_data):
-            print(f"  [{i + 1}] {img['tmp_url']}")
-            print(f"      ![]({img['tmp_url']})")
-
-
-# ---------------------------------------------------------------------------
-# CLI
-# ---------------------------------------------------------------------------
+        print("\n✅ 视频生成成功！")
+        print(f"📍 {video_url}")
+        print(f"🎬 [点击播放]({video_url})")
+        print(f"🤖 模型: {args.model}")
+        print(f"📋 模式: {mode}")
+        if args.duration is not None:
+            print(f"⏱ 时长: {args.duration} 秒")
+        if args.ratio:
+            print(f"📐 比例: {args.ratio}")
+        if result["task_id"]:
+            print(f"任务 ID: {result['task_id']}")
 
 
 def main():
-    parser = argparse.ArgumentParser(
-        description="AI 视频生成 — 文生视频 / 图生视频（可灵 / Vidu）",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-    )
+    parser = argparse.ArgumentParser(description="MiniMax H3 视频生成")
     sub = parser.add_subparsers(dest="subcommand")
-
-    sub.add_parser("list-models", help="列出所有可用视频模型及参数")
-
-    p_run = sub.add_parser("run", help="生成视频（默认）")
-    add_generate_args(p_run)
-
+    sub.add_parser("list-models", help="列出 MiniMax 视频模型和参数")
+    run_parser = sub.add_parser("run", help="生成视频（默认）")
+    add_generate_args(run_parser)
     args = parser.parse_args()
 
     if args.subcommand == "list-models":
         cmd_list_models(args)
-    elif args.subcommand is None or args.subcommand == "run":
-        cmd_run(args) if hasattr(args, "prompt") else parser.print_help()
+    elif args.subcommand == "run":
+        cmd_run(args)
     else:
         parser.print_help()
         sys.exit(1)

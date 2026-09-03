@@ -6,7 +6,7 @@ author:
   name: aimaxhug
 license: Apache-2.0
 metadata:
-  tags: ai, image, text2image, image2image, image-edit, upload, video, text2video, audio, text2speech, tts, search, web-search, baidu, kling, vidu, aimaxhug
+  tags: ai, image, text2image, image2image, image-edit, upload, video, text2video, minimax, minimax-h3, audio, text2speech, tts, search, web-search, baidu, aimaxhug
   requires:
     bins: [python3]
     python: ">=3.8"
@@ -77,7 +77,7 @@ AI 执行任何命令前，先 cd 到项目根目录。
 | 模块 | 脚本 | 参考文档 | 说明 |
 |------|------|---------|------|
 | AI 图像生成 | `scripts/ai_image.py` | [ai_image.md](references/ai_image.md) | 文生图、图生图，支持 5 个模型 |
-| AI 视频生成 | `scripts/ai_video.py` | [ai_video.md](references/ai_video.md) | 文生视频、图生视频，支持可灵 / Vidu |
+| AI 视频生成 | `scripts/ai_video.py` | [ai_video.md](references/ai_video.md) | 文生视频、图生视频、首尾帧和参考视频驱动，仅支持 MiniMax H3 |
 | 文件上传 | `scripts/upload.py` | [upload.md](references/upload.md) | 上传本地文件，返回临时 URL |
 | AI 音频生成 | `scripts/ai_audio.py` | [ai_audio.md](references/ai_audio.md) | 文生音频、音色描述、声音克隆，支持 MiniMax Speech 2.8 |
 | 百度 AI 搜索 | `scripts/ai_search.py` | [ai_search.md](references/ai_search.md) | 百度联网搜索，支持 GET / POST，返回可引用网页结果 |
@@ -164,50 +164,34 @@ python scripts/ai_image.py run --model nano-banana --prompt "一只猫" --count 
 
 详细见 [ai_image.md](references/ai_image.md)。
 
-### 二、视频生成
+### 二、视频生成（MiniMax H3）
 
-**必须按以下顺序执行：**
-
-**第一步 — 展示模型表格（必须！）**
+视频生成仅能使用 MiniMax H3 系列。先展示模型表格，再等待用户选择模型、时长、画幅和参考素材。
 
 ```bash
 cd <项目根目录>
 python scripts/ai_video.py list-models
-```
-
-展示后等待用户选择模型、比例、时长、分辨率。
-
-**第二步 — 执行生成**
-
-```bash
-cd <项目根目录>
 
 # 文生视频
-python scripts/ai_video.py run --model kling --prompt "提示词" --proportion 16:9 --duration 5 --resolution 720p
+python scripts/ai_video.py run --model minimax-h3-768p --prompt "提示词" --duration 5 --ratio 16:9
 
-# 15秒时长
-python scripts/ai_video.py run --model vidu --prompt "提示词" --proportion 9:16 --duration 15 --resolution 720p
+# 图生视频：最多 5 张参考图，可选最多 3 个参考音频
+python scripts/ai_video.py run --model minimax-h3-2k --prompt "提示词" --reference-images photo.jpg --duration 5 --ratio 9:16
 
-# 图生视频
-python scripts/ai_video.py run --model vidu --prompt "提示词" --input-images photo.jpg --proportion 9:16
+# 首尾帧：不可与 --reference-images 同时使用
+python scripts/ai_video.py run --model minimax-h3-2k --prompt "提示词" --first-image start.jpg --last-image end.jpg --duration 5 --ratio 16:9
 
-# ⭐ 视频生视频（消耗巨大，必须警告用户确认）
-python scripts/ai_video.py run --model kling --prompt "提示词" --input-images video.mp4 --proportion 16:9
-
-# ⭐ 多视频并行生成 — 用 --count 指定数量
-python scripts/ai_video.py run --model kling --prompt "赛博朋克城市" --count 3 --proportion 16:9 --resolution 720p
+# 参考视频驱动：仅 Pro 模型，且只能 1 段 2-5 秒参考视频
+python scripts/ai_video.py run --model minimax-h3-pro-768p --prompt "提示词" --reference-videos source.mp4 --duration 5 --ratio 16:9
 ```
 
-> **三种模式说明**：
-> - **文生视频** — 仅传 `--prompt`，不传 `--input-images`
-> - **图生视频** — 传 `--prompt` + `--input-images`（图片文件）
-> - **视频生视频** — 传 `--prompt` + `--input-images`（视频文件，⚠️ **消耗巨大，必须提前告知用户并确认**）
+> **四种模式说明**：
+> - **文生视频** — 仅传 `--prompt`；此模式不能使用 `--ratio adaptive`。
+> - **图生视频** — `--prompt` + `--reference-images`（最多 5 张）；可附 `--reference-audios`（最多 3 个，必须配参考图，合计不超过 15 秒）。
+> - **首尾帧** — `--first-image`，可附 `--last-image`；不能与 `--reference-images` 同用。
+> - **参考视频驱动** — Pro 模型 + `--reference-videos`；只能传 1 段、时长 2-5 秒。
 >
-> ⭐ **多视频生成规则**：
-> - `--count N` = 一次生成 N 个视频，**脚本自动并行执行**
-> - **AI 不允许一个一个跑！用户说生成多个视频时，必须用 `--count` 一次完成**
-> - **最多一次性生成 5 个**（`--count` 最大 5）
-> - ⚠️ **禁止同时执行多条命令**，每次只能执行一条命令，等上一条完成后才能执行下一条
+> 参考素材可传公网直链、data URI 或本地文件。本地文件由脚本自动转换为 base64；公网链接必须可直接访问。接口采用提交任务后轮询的异步流程，2K 和参考视频请求在高峰期可能排队。
 
 详细见 [ai_video.md](references/ai_video.md)。
 
@@ -268,10 +252,10 @@ python scripts/ai_video.py run --model kling --prompt "赛博朋克城市" --cou
 | 自定义风格生成 | Available | `scripts/ai_image.py run --count N --styles 写实 卡通 ...` |
 | 列出模型 | Available | `scripts/ai_image.py list-models` |
 | 文件上传 | Available | `scripts/upload.py run` |
-| 文生视频 | Available | `scripts/ai_video.py run` (不带 `--input-images`) |
-| 图生视频 | Available | `scripts/ai_video.py run` (带 `--input-images` 图片) |
-| 视频生视频 | Available（消耗巨大） | `scripts/ai_video.py run` (带 `--input-images` 视频) |
-| 多视频并行生成 | Available | `scripts/ai_video.py run --count N` |
+| 文生视频（MiniMax H3） | Available | `scripts/ai_video.py run --model minimax-h3-768p --prompt <提示词>` |
+| 图生视频（MiniMax H3） | Available | `scripts/ai_video.py run --reference-images <图片>` |
+| 首尾帧视频（MiniMax H3） | Available | `scripts/ai_video.py run --first-image <首帧> --last-image <尾帧>` |
+| 参考视频驱动（MiniMax H3 Pro） | Available | `scripts/ai_video.py run --model minimax-h3-pro-768p --reference-videos <视频>` |
 | 列出视频模型 | Available | `scripts/ai_video.py list-models` |
 | 文生音频 | Available | `scripts/ai_audio.py run`（短文本 `/v1/minimax/audio`） |
 | 长文本音频 | Available | `scripts/ai_audio.py run --long`（`/v1/minimax/audio/long`） |

@@ -1,141 +1,97 @@
-# AI Video Module
+# MiniMax H3 Video Module
 
-Generate videos using Kling / Vidu. 支持三种模式。
+视频生成使用 MiniMax H3 系列，通过异步接口提交任务并轮询到视频完成。
 
-## Supported Task Types
+## Supported Models
 
-| Type | Description | Input |
-|------|-------------|-------|
-| **文生视频 (Text-to-Video)** | Generate from text prompt only | No `--input-images` |
-| **图生视频 (Image-to-Video)** | Generate with reference images | `--input-images` with image files |
-| **视频生视频 (Video-to-Video)** | Generate with reference video | `--input-images` with video files (⚠️ high cost) |
+| Model key | Model | Resolution tier | Reference video |
+|-----------|-------|-----------------|-----------------|
+| `minimax-h3-768p` | MiniMax H3 | 768p | No |
+| `minimax-h3-2k` | MiniMax H3 | 2K | No |
+| `minimax-h3-pro-768p` | MiniMax H3 Pro | 768p | Yes |
+| `minimax-h3-pro-2k` | MiniMax H3 Pro | 2K | Yes |
 
-## Subcommands
+## API Workflow
 
-| Subcommand | When to use |
-|------------|-------------|
-| `run` | **Default.** Generate video and show result |
-| `list-models` | Show available video models, durations, resolutions, and proportions |
+1. Submit `POST https://apis.aimaxhug.cloud/v1/videos` with JSON body and Bearer authentication.
+2. Read `task_id` from the response.
+3. Poll `GET https://apis.aimaxhug.cloud/v1/videos/{model}/{task_id}` until status is completed and `video_url` is returned.
 
-## Usage
+The script performs this workflow automatically.
 
-```bash
-python {baseDir}/scripts/ai_video.py <subcommand> [options]
-```
-
-## Examples
-
-### List Models
+## CLI Usage
 
 ```bash
 python {baseDir}/scripts/ai_video.py list-models
+python {baseDir}/scripts/ai_video.py run [options]
 ```
 
 ### Text-to-Video
 
 ```bash
-# Kling — 720p default
 python {baseDir}/scripts/ai_video.py run \
-  --model kling \
-  --prompt "一只橘猫在阳光下打滚" \
-  --proportion 16:9 \
+  --model minimax-h3-768p \
+  --prompt "清晨的海浪涌向沙滩，金色阳光映照水面，电影感镜头" \
   --duration 5 \
-  --resolution 720p
-
-# Vidu — 1080p
-python {baseDir}/scripts/ai_video.py run \
-  --model vidu \
-  --prompt "城市夜景航拍" \
-  --proportion 9:16 \
-  --duration 10 \
-  --resolution 1080p
-
-# Kling — 15s duration
-python {baseDir}/scripts/ai_video.py run \
-  --model kling \
-  --prompt "壮丽的山河航拍" \
-  --proportion 16:9 \
-  --duration 15 \
-  --resolution 720p
+  --ratio 16:9
 ```
 
-### Image-to-Video (with reference)
+### Image-to-Video
 
 ```bash
-# Vidu with reference image
 python {baseDir}/scripts/ai_video.py run \
-  --model vidu \
-  --prompt "人物在沙滩上行走" \
-  --input-images photo.jpg \
-  --proportion 16:9
-
-# Kling with multiple images (first/last frame)
-python {baseDir}/scripts/ai_video.py run \
-  --model kling \
-  --prompt "花朵从绽放到凋谢" \
-  --input-images start.jpg end.jpg \
-  --proportion 9:16
+  --model minimax-h3-2k \
+  --prompt "人物自然转身，镜头缓慢推进" \
+  --reference-images image1.jpg image2.jpg \
+  --reference-audios narration.mp3 \
+  --duration 8 \
+  --ratio 9:16
 ```
 
-### Video-to-Video (⚠️ High Cost)
+### First/Last Frame
 
 ```bash
-# Kling with reference video
 python {baseDir}/scripts/ai_video.py run \
-  --model kling \
-  --prompt "转换成电影风格" \
-  --input-images source.mp4 \
-  --proportion 16:9
+  --model minimax-h3-2k \
+  --prompt "花朵从含苞到盛开，画面自然过渡" \
+  --first-image start.jpg \
+  --last-image end.jpg \
+  --duration 6 \
+  --ratio 16:9
 ```
 
-> ⚠️ **视频生视频消耗巨大**，AI 必须提前告知用户并确认后再执行。
-
-### Multi-Video Generation (Parallel)
+### Reference-Video Driven
 
 ```bash
-# Generate 3 videos with different cinematic styles
 python {baseDir}/scripts/ai_video.py run \
-  --model kling \
-  --prompt "赛博朋克城市" \
-  --count 3 \
-  --proportion 16:9 \
-  --resolution 720p
+  --model minimax-h3-pro-768p \
+  --prompt "保持人物动作节奏，改为电影级暖色调" \
+  --reference-videos source.mp4 \
+  --duration 5 \
+  --ratio 16:9
 ```
 
-> ⚠️ Max `--count` is **5**. Single command at a time — wait for completion before next.
+## Request Mapping
 
-## Options
+| CLI option | API field | Constraint |
+|------------|-----------|------------|
+| `--model` | `model` | One of the four model keys above |
+| `--prompt` | `prompt` | Required; at most 7000 characters |
+| `--duration` | `duration` | Optional; integer from 4 to 15 seconds |
+| `--ratio` | `ratio` | `16:9`, `9:16`, `1:1`, `21:9`, `4:3`, `3:4`, or `adaptive` |
+| `--reference-images` | `referenceImages` | Up to 5 URLs, data URIs, or local files |
+| `--reference-audios` | `referenceAudios` | Up to 3; requires `referenceImages` |
+| `--reference-videos` | `referenceVideos` | Pro models only; exactly one source video |
+| `--first-image` | `first_image` | Cannot be combined with `referenceImages` |
+| `--last-image` | `last_image` | Cannot be combined with `referenceImages` |
 
-| Option | Description |
-|--------|-------------|
-| `--model` | Model key: `kling`, `vidu` (required) |
-| `--prompt` | Text prompt describing the video (required) |
-| `--proportion` | Aspect ratio: `16:9`, `9:16`, `1:1` |
-| `--duration` | Duration in seconds: `5`, `10`, `15` (default: `5`)。传入参考素材时仅支持 5-10 秒 |
-| `--resolution` | `720p` / `1080p` / `4k`（4k 仅可灵支持，Vidu 不支持） |
-| `--input-images` | 参考素材路径（传图=图生视频，传视频=视频生视频，不传=文生视频） |
-| `--count` | Number of videos to generate (default: 1, max: 5). **When > 1, tasks run in parallel** |
-| `--json` | Output result as JSON |
+Local files are automatically encoded as `data:<mime>;base64,...`. Public URLs must be directly accessible.
 
-## Supported Models
+## Validation Rules
 
-| Model | Key | Resolutions | Durations | Proportions | Notes |
-|-------|-----|-------------|-----------|-------------|-------|
-| **可灵 (Kling)** | `kling` | 720p / 1080p / 4k | 5s / 10s / 15s | 16:9 / 9:16 / 1:1 | 传参考素材时 15s 不可用 |
-| **Vidu** | `vidu` | 720p / 1080p | 5s / 10s / 15s | 16:9 / 9:16 / 1:1 | 传参考素材时 15s 不可用；不支持 4k |
-
-## Compatibility Notes
-
-| 场景 | 说明 |
-|------|------|
-| 文生视频 + 15 秒 | 所有模型均支持 |
-| 图生/视频生视频 + 15 秒 | **不支持**，脚本会提示但继续请求；如失败请换 5/10 秒 |
-| Vidu + 4k | **不支持**，脚本会提示但继续请求；如失败请换 720p/1080p |
-| Kling + 4k | 仅文生视频支持，图生视频不保证 |
-
-## Notes
-
-- Video generation typically takes 1–3 minutes（视频生视频可能更久）
-- 不传 `--input-images` = 文生视频；传图片 = 图生视频；传视频 = 视频生视频
-- When providing multiple reference images, the first becomes the start frame and the last becomes the end frame (Vidu首尾帧)
-- **视频生视频消耗巨大，请谨慎使用**
+- Text-only video cannot use `ratio=adaptive`.
+- `first_image` / `last_image` and `referenceImages` are mutually exclusive.
+- Reference audio must be supplied together with reference images; provide at most three audio files and keep their total duration within 15 seconds.
+- Reference video is available only to Pro models and must be one 2-5 second source video.
+- 2K and reference-video requests can take longer during peak periods. Retry a request that remains queued or fails transiently.
+- Content policy is enforced by the API. Disallowed prompts fail with HTTP 400 before a task is created or billed.
