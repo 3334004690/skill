@@ -196,6 +196,8 @@ python scripts/minimax_video.py run --model minimax-h3-pro-768p --prompt "提示
 > 如果提交响应是 HTTP 400 但响应体包含 `task_id`，不得丢弃任务或停止；必须保留该 ID，继续调用轮询接口查询最终状态。只有 400 且没有 `task_id` 时，才在提交阶段停止。
 >
 > `prompt` 最多 7000 字符，超出部分按接口规则静默截断，不会生效。`duration` 未指定时脚本发送默认值 5 秒；用户指定的 8 秒等值会原样写入提交 JSON。
+>
+> 视频时长以 JSON 的 `duration` 字段为准。生成提示词中如果出现“5-second/5 秒”等时长描述，必须与 `duration` 保持一致，避免提示词语义与计费参数冲突。后台旧版 Seedance 日志可能显示 `aspect_ratio: None`，新接口实际使用的是 `ratio` 字段，不得因此改回 `aspect_ratio`。
 
 详细见 [minimax_video.md](references/minimax_video.md)。
 

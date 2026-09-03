@@ -100,3 +100,4 @@ Local files are automatically encoded as `data:<mime>;base64,...`. Public URLs m
 - Reference video is available only to Pro models and must be one 2-5 second source video.
 - 2K and reference-video requests can take longer during peak periods; keep polling until completion or timeout.
 - Content policy is enforced by the API. A normal rejected prompt fails with HTTP 400 before a task is created or billed. If a 400 response nevertheless contains a `task_id`, the predefined script preserves that ID and continues polling it.
+- Video length is controlled by the JSON `duration` field. Keep any duration wording inside `prompt` consistent with that value; `ratio` is the current aspect-ratio field even if legacy backend logs label it as `aspect_ratio`.

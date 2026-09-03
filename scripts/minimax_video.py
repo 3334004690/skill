@@ -281,6 +281,12 @@ def add_generate_args(parser):
 
 
 def _submit_and_wait(client, body, poll_timeout):
+    print(
+        f"📨 POST {VIDEO_ENDPOINT} | model={body.get('model')} | "
+        f"duration={body.get('duration')} | ratio={body.get('ratio', '未指定')} | "
+        f"referenceImages={len(body.get('referenceImages', []))}",
+        file=sys.stderr,
+    )
     http_status, response = client.post_with_status(VIDEO_ENDPOINT, json=body, timeout=120)
     task_id = _task_id(response)
     # The gateway may return HTTP 400 together with a valid task ID. Keep the
