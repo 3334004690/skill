@@ -193,7 +193,9 @@ python scripts/minimax_video.py run --model minimax-h3-pro-768p --prompt "提示
 >
 > 参考素材可传公网直链、data URI 或本地文件。本地文件由脚本在内存中转换为 base64；公网链接必须可直接访问。提交成功后必须立即向用户报告任务 ID，并持续轮询返回状态/进度，直到完成或失败。接口固定为 `POST https://apis.aimaxhug.cloud/v1/videos`，轮询 `GET https://apis.aimaxhug.cloud/v1/videos/minimax-h3/{task_id}`；默认最长轮询 20 分钟（1200 秒），2K 和参考视频请求在高峰期可能排队。
 >
-> `prompt` 最多 7000 字符，超出部分按接口规则静默截断，不会生效。
+> 如果提交响应是 HTTP 400 但响应体包含 `task_id`，不得丢弃任务或停止；必须保留该 ID，继续调用轮询接口查询最终状态。只有 400 且没有 `task_id` 时，才在提交阶段停止。
+>
+> `prompt` 最多 7000 字符，超出部分按接口规则静默截断，不会生效。`duration` 未指定时脚本发送默认值 5 秒；用户指定的 8 秒等值会原样写入提交 JSON。
 
 详细见 [minimax_video.md](references/minimax_video.md)。
 

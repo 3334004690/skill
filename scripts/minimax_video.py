@@ -31,6 +31,7 @@ POLL_INTERVAL_FAST = 4
 POLL_INTERVAL_SLOW = 12
 DEFAULT_POLL_TIMEOUT = 20 * 60
 MAX_PROMPT_CHARS = 7_000
+DEFAULT_DURATION = 5
 MAX_REFERENCE_IMAGES = 5
 MAX_REFERENCE_AUDIOS = 3
 MAX_REFERENCE_VIDEOS = 1
@@ -280,11 +281,19 @@ def add_generate_args(parser):
 
 
 def _submit_and_wait(client, body, poll_timeout):
-    response = client.post(VIDEO_ENDPOINT, json=body, timeout=120)
-    if response.get("success") is False or _status(response) in {"failed", "failure", "error"}:
-        raise AimaxhugError(_error_message(response))
-    direct_url = _video_url(response)
+    http_status, response = client.post_with_status(VIDEO_ENDPOINT, json=body, timeout=120)
     task_id = _task_id(response)
+    # The gateway may return HTTP 400 together with a valid task ID. Keep the
+    # ID and query it instead of discarding the task at submission time.
+    if http_status < 200 or http_status >= 300:
+        if not task_id:
+            raise AimaxhugError(_error_message(response), http_status)
+        print(f"⚠️ 提交接口返回 HTTP {http_status}，但已生成任务 ID；继续查询任务。", file=sys.stderr)
+    if response.get("success") is False and not task_id:
+        raise AimaxhugError(_error_message(response), http_status)
+    if _status(response) in {"failed", "failure", "error"} and not task_id:
+        raise AimaxhugError(_error_message(response), http_status)
+    direct_url = _video_url(response)
     if direct_url:
         if task_id:
             print(f"✅ 任务已提交，任务 ID: {task_id}", file=sys.stderr)
@@ -299,14 +308,22 @@ def _submit_and_wait(client, body, poll_timeout):
     print(f"✅ 任务已提交，任务 ID: {task_id}", file=sys.stderr)
     while time.monotonic() - started < poll_timeout:
         poll_count += 1
-        status_response = client.get(status_endpoint, timeout=120)
+        try:
+            poll_http_status, status_response = client.get_with_status(status_endpoint, timeout=120)
+        except AimaxhugError as exc:
+            elapsed = int(time.monotonic() - started)
+            print(f"⚠️ 任务 {task_id} 第 {poll_count} 次查询暂时失败：{exc}；继续查询（已等待 {elapsed} 秒）", file=sys.stderr)
+            elapsed_seconds = time.monotonic() - started
+            time.sleep(POLL_INTERVAL_FAST if elapsed_seconds < 60 else POLL_INTERVAL_SLOW)
+            continue
         status = _status(status_response)
         direct_url = _video_url(status_response)
         nested = _nested_data(status_response)
         progress = nested.get("progress") if "progress" in nested else status_response.get("progress")
         progress_text = f"，进度 {progress}%" if progress is not None else ""
         elapsed = int(time.monotonic() - started)
-        print(f"⏳ 任务 {task_id}：第 {poll_count} 次轮询，状态 {status or 'processing'}{progress_text}（已等待 {elapsed} 秒）", file=sys.stderr)
+        http_text = f"，HTTP {poll_http_status}" if poll_http_status < 200 or poll_http_status >= 300 else ""
+        print(f"⏳ 任务 {task_id}：第 {poll_count} 次轮询，状态 {status or 'processing'}{progress_text}{http_text}（已等待 {elapsed} 秒）", file=sys.stderr)
         if direct_url or status in {"completed", "complete", "succeeded", "success", "done"}:
             if not direct_url:
                 raise AimaxhugError("任务已完成但响应中没有视频 URL")
@@ -327,7 +344,8 @@ def cmd_run(args):
         reference_videos = _media_values(args.reference_videos, "参考视频")
         first_image = _media_value(args.first_image) if args.first_image else None
         last_image = _media_value(args.last_image) if args.last_image else None
-        body = build_body(args.model, args.prompt, args.duration, args.ratio, reference_images,
+        duration = args.duration if args.duration is not None else DEFAULT_DURATION
+        body = build_body(args.model, args.prompt, duration, args.ratio, reference_images,
                           reference_audios, reference_videos, first_image, last_image)
     except ValueError as exc:
         print(f"Error: {exc}", file=sys.stderr)
@@ -342,7 +360,11 @@ def cmd_run(args):
         mode = "首尾帧"
     elif has_references:
         mode = "图生视频"
-    print(f"🎬 正在使用 {args.model} 进行{mode}，提交任务并等待完成...", file=sys.stderr)
+    print(
+        f"🎬 正在使用 {args.model} 进行{mode}，提交配置：duration={body['duration']} 秒"
+        f"，ratio={body.get('ratio', '默认')}；提交任务并等待完成...",
+        file=sys.stderr,
+    )
 
     try:
         response, video_url, task_id = _submit_and_wait(client, body, args.poll_timeout)
@@ -356,7 +378,7 @@ def cmd_run(args):
         "task_id": task_id or _task_id(response),
         "model": args.model,
         "prompt": body["prompt"],
-        "duration": args.duration,
+        "duration": body["duration"],
         "ratio": args.ratio,
         "mode": mode,
     }
@@ -368,8 +390,7 @@ def cmd_run(args):
         print(f"🎬 [点击播放]({video_url})")
         print(f"🤖 模型: {args.model}")
         print(f"📋 模式: {mode}")
-        if args.duration is not None:
-            print(f"⏱ 时长: {args.duration} 秒")
+        print(f"⏱ 时长: {body['duration']} 秒")
         if args.ratio:
             print(f"📐 比例: {args.ratio}")
         if result["task_id"]:

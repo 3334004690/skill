@@ -44,6 +44,14 @@ class AimaxhugClient:
 
     def post(self, path: str, json: Optional[dict] = None, **kwargs) -> dict:
         """POST to an API endpoint and return parsed JSON."""
+        status_code, data = self.post_with_status(path, json=json, **kwargs)
+        if status_code < 200 or status_code >= 300:
+            msg = data.get("message", f"HTTP {status_code}")
+            raise AimaxhugError(msg, status_code)
+        return data
+
+    def post_with_status(self, path: str, json: Optional[dict] = None, **kwargs):
+        """POST and return ``(http_status, parsed_json)`` without HTTP raising."""
         url = f"{BASE_URL}{path}" if path.startswith("/") else path
         try:
             resp = requests.post(url, headers=self.headers, json=json,
@@ -58,14 +66,18 @@ class AimaxhugClient:
         except ValueError:
             raise AimaxhugError(f"响应解析失败: {resp.text[:200]}", resp.status_code)
 
-        if resp.status_code != 200:
-            msg = data.get("message", f"HTTP {resp.status_code}")
-            raise AimaxhugError(msg, resp.status_code)
-
-        return data
+        return resp.status_code, data
 
     def get(self, path: str, params: Optional[dict] = None, **kwargs) -> dict:
         """GET an authenticated endpoint and return parsed JSON."""
+        status_code, data = self.get_with_status(path, params=params, **kwargs)
+        if status_code < 200 or status_code >= 300:
+            msg = data.get("message", f"HTTP {status_code}")
+            raise AimaxhugError(msg, status_code)
+        return data
+
+    def get_with_status(self, path: str, params: Optional[dict] = None, **kwargs):
+        """GET and return ``(http_status, parsed_json)`` without HTTP raising."""
         url = f"{BASE_URL}{path}" if path.startswith("/") else path
         try:
             resp = requests.get(url, headers=self.headers, params=params,
@@ -80,11 +92,7 @@ class AimaxhugClient:
         except ValueError:
             raise AimaxhugError(f"响应解析失败: {resp.text[:200]}", resp.status_code)
 
-        if resp.status_code < 200 or resp.status_code >= 300:
-            msg = data.get("message", f"HTTP {resp.status_code}")
-            raise AimaxhugError(msg, resp.status_code)
-
-        return data
+        return resp.status_code, data
 
     def post_file(self, path: str, file_path: str, mime_type: str, **kwargs) -> dict:
         """POST a multipart file upload and return parsed JSON."""

@@ -19,6 +19,8 @@
 
 The predefined script performs all validation and polling. It never creates `.env`, prompt files, helper scripts, or alternate video-generation scripts at runtime. Any validation or API error stops the request before generation.
 
+If submission returns HTTP 400 but includes a `task_id`, the script preserves the task ID and continues polling. A 400 without a task ID is treated as a submission failure.
+
 ## CLI Usage
 
 ```bash
@@ -79,7 +81,7 @@ python {baseDir}/scripts/minimax_video.py run \
 |------------|-----------|------------|
 | `--model` | `model` | One of the four model keys above |
 | `--prompt` | `prompt` | Required; API silently truncates text beyond 7000 characters |
-| `--duration` | `duration` | Optional; integer from 4 to 15 seconds |
+| `--duration` | `duration` | Integer from 4 to 15 seconds; script sends 5 seconds when omitted |
 | `--ratio` | `ratio` | `16:9`, `9:16`, `1:1`, `21:9`, `4:3`, `3:4`, or `adaptive` |
 | `--reference-images` | `referenceImages` | Up to 5 URLs, data URIs, or local files |
 | `--reference-audios` | `referenceAudios` | Up to 3; requires `referenceImages` |
@@ -97,4 +99,4 @@ Local files are automatically encoded as `data:<mime>;base64,...`. Public URLs m
 - Reference audio must be supplied together with reference images; provide at most three audio files and keep their total duration within 15 seconds.
 - Reference video is available only to Pro models and must be one 2-5 second source video.
 - 2K and reference-video requests can take longer during peak periods; keep polling until completion or timeout.
-- Content policy is enforced by the API. Disallowed prompts fail with HTTP 400 before a task is created or billed.
+- Content policy is enforced by the API. A normal rejected prompt fails with HTTP 400 before a task is created or billed. If a 400 response nevertheless contains a `task_id`, the predefined script preserves that ID and continues polling it.
