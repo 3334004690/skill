@@ -21,6 +21,7 @@ description: >
 | 百度搜索 | 百度搜索、AI搜索、联网搜索、网页搜索、搜索一下、web search、Baidu search、search the web |
 | 短视频解析 | 短视频解析、视频解析、解析视频、提取视频链接、解析抖音、解析小红书、parse video、video parse |
 | 文件上传 | 上传文件、上传图片、upload file、upload image |
+| 网页转图片 | 网页转图片、HTML转图片、网页截图、html to image、html screenshot |
 
 ## 文件结构
 
@@ -32,6 +33,7 @@ scripts/
   ai_audio.py            ← 文生音频和声音克隆脚本（MiniMax Speech 2.8）
   ai_search.py           ← 百度 AI 搜索脚本（支持 GET / POST）
   video_parse.py        ← 短视频解析脚本（提取视频直链）
+  html2image.py         ← HTML 转图片脚本
   upload.py              ← 上传脚本
   shared/                ← 共享模块（config, client）
 references/
@@ -40,6 +42,7 @@ references/
   ai_audio.md            ← 音频生成参考文档
   ai_search.md           ← 百度搜索参考文档
   video_parse.md        ← 短视频解析参考文档
+  html2image.md          ← HTML 转图片参考文档
   upload.md              ← 上传参考文档
 ```
 
