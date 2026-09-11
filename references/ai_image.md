@@ -109,7 +109,7 @@ python {baseDir}/scripts/ai_image.py run \
 
 | Option | Description |
 |--------|-------------|
-| `--model` | Model key: `nano-banana`, `nano-banana-pro`, `doubao-seedream-5-0-260128`, `doubao-seedream-5-0-pro-260628`, `gpt-image-2` (required) |
+| `--model` | Model key: `nano-banana`, `nano-banana-pro`, `doubao-seedream-5-0-260128`, `doubao-seedream-5-0-pro-260628`, `gpt-image-2`, `gpt-image-2.5-sunburst`, `gpt-image-2.5-flare` (required) |
 | `--prompt` | Text prompt describing the image (required) |
 | `--proportion` | Aspect ratio, e.g. `16:9`, `1:1`, `9:16` |
 | `--resolution` | Nano Banana/Seedream: `1k` / `2k` / `4k`; gpt-image-2: `auto` or `WIDTHxHEIGHT` (must meet dynamic-size constraints) |
@@ -127,6 +127,8 @@ python {baseDir}/scripts/ai_image.py run \
 | **Seedream 5.0** | Manual | `1k` / `2k` / `4k` (default: `1k`) |
 | **Seedream 5.0 Pro** | Manual | `1k` / `2k` / `4k` (default: `1k`) |
 | **gpt-image-2** | Dynamic | `auto` or custom `WIDTHxHEIGHT`; max edge 3840px, 16px multiples, ratio ≤ 3:1, total 655,360–8,294,400px |
+| **gpt-image-2.5-sunburst** | Dynamic | `auto` or custom `WIDTHxHEIGHT`; max edge 3840px, 16px multiples, ratio ≤ 3:1, total 655,360–8,294,400px |
+| **gpt-image-2.5-flare** | Dynamic | `auto` or custom `WIDTHxHEIGHT`; max edge 3840px, 16px multiples, ratio ≤ 3:1, total 655,360–8,294,400px |
 
 ## Supported Proportions (per model)
 
@@ -137,6 +139,8 @@ python {baseDir}/scripts/ai_image.py run \
 | **Seedream 5.0** | `1:1` `9:16` `16:9` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `21:9` (10种) |
 | **Seedream 5.0 Pro** | `1:1` `9:16` `16:9` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `21:9` (10种) |
 | **gpt-image-2** | `1:1` `9:16` `16:9` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `21:9` (10种) |
+| **gpt-image-2.5-sunburst** | `1:1` `9:16` `16:9` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `21:9` (10种) |
+| **gpt-image-2.5-flare** | `1:1` `9:16` `16:9` `2:3` `3:2` `3:4` `4:3` `4:5` `5:4` `21:9` (10种) |
 
 ## Model Recommendation
 

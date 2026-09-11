@@ -145,8 +145,10 @@ python scripts/ai_image.py run --model nano-banana --prompt "提示词" --propor
 # 图生图
 python scripts/ai_image.py run --model nano-banana-pro --prompt "编辑指令" --input-images photo.jpg --proportion 16:9 --resolution 4k
 
-# gpt-image-2 支持 auto 或自定义 WIDTHxHEIGHT
+# gpt-image-2 / 2.5 支持 auto 或自定义 WIDTHxHEIGHT
 python scripts/ai_image.py run --model gpt-image-2 --prompt "提示词" --resolution 1024x1536
+python scripts/ai_image.py run --model gpt-image-2.5-sunburst --prompt "提示词" --resolution 1024x1536
+python scripts/ai_image.py run --model gpt-image-2.5-flare --prompt "提示词" --resolution 1024x1536
 
 # ⭐ 多图生成（并行执行！）— 用 --count 指定数量，--styles 可选指定风格
 python scripts/ai_image.py run --model gpt-image-2 --prompt "赛博朋克城市" --count 5 --resolution 2048x1152
@@ -210,9 +212,11 @@ python scripts/minimax_video.py run --model minimax-h3-pro-768p --prompt "提示
 | 细节丰富/色彩鲜艳 | **Seedream 5.0** — `doubao-seedream-5-0-260128`，手动选 1k/2k/4k，支持10种比例 |
 | 更高品质/复杂场景 | **Seedream 5.0 Pro** — `doubao-seedream-5-0-pro-260628`，手动选 1k/2k/4k，支持10种比例 |
 | 照片级写实/艺术风格 | **gpt-image-2** — 支持 `auto` 或自定义 `WIDTHxHEIGHT` 动态像素尺寸（最大 3840px，须为16的倍数） |
+| gpt-image-2 升级版 | **gpt-image-2.5-sunburst** — `auto` 或自定义 `WIDTHxHEIGHT` 动态像素尺寸 |
+| gpt-image-2 升级版 | **gpt-image-2.5-flare** — `auto` 或自定义 `WIDTHxHEIGHT` 动态像素尺寸 |
 
 > ⚠️ 每个模型支持的**比例不同**，展示模型表格时会列出各模型专属的比例列表。
-> **gpt-image-2** 支持 `auto` 或自定义 `WIDTHxHEIGHT` 分辨率；宽高均不超过 3840px、须为 16px 的倍数、长宽比不超过 3:1，总像素范围为 655,360–8,294,400。
+> **gpt-image-2 / 2.5-sunburst / 2.5-flare** 支持 `auto` 或自定义 `WIDTHxHEIGHT` 分辨率；宽高均不超过 3840px、须为 16px 的倍数、长宽比不超过 3:1，总像素范围为 655,360–8,294,400。
 
 ---
 

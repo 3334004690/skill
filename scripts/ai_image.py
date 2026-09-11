@@ -131,6 +131,30 @@ MODELS = {
         ],
         "default_resolution": "auto",
     },
+    "gpt-image-2.5-sunburst": {
+        "api_model": "gpt-image-2.5-sunburst",
+        "name": "gpt-image-2.5-sunburst",
+        "desc": "gpt-image-2 升级版，照片级写实与艺术创作",
+        "proportions": ["1:1", "9:16", "16:9", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "21:9"],
+        "resolution_mode": "dynamic",
+        "resolutions": [
+            "auto", "1024x1024", "2048x2048", "1536x1024",
+            "2048x1152", "3840x2160", "1024x1536", "2160x3840",
+        ],
+        "default_resolution": "auto",
+    },
+    "gpt-image-2.5-flare": {
+        "api_model": "gpt-image-2.5-flare",
+        "name": "gpt-image-2.5-flare",
+        "desc": "gpt-image-2 升级版，精准构图与高细节表现",
+        "proportions": ["1:1", "9:16", "16:9", "2:3", "3:2", "3:4", "4:3", "4:5", "5:4", "21:9"],
+        "resolution_mode": "dynamic",
+        "resolutions": [
+            "auto", "1024x1024", "2048x2048", "1536x1024",
+            "2048x1152", "3840x2160", "1024x1536", "2160x3840",
+        ],
+        "default_resolution": "auto",
+    },
 }
 
 
