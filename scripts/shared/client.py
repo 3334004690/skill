@@ -53,8 +53,10 @@ class AimaxhugClient:
     def post_with_status(self, path: str, json: Optional[dict] = None, **kwargs):
         """POST and return ``(http_status, parsed_json)`` without HTTP raising."""
         url = f"{BASE_URL}{path}" if path.startswith("/") else path
+        request_headers = dict(self.headers)
+        request_headers.update(kwargs.pop("headers", {}) or {})
         try:
-            resp = requests.post(url, headers=self.headers, json=json,
+            resp = requests.post(url, headers=request_headers, json=json,
                                  timeout=kwargs.pop("timeout", 900), **kwargs)
         except requests.exceptions.Timeout:
             raise AimaxhugError("请求超时（>900秒）", 0)
@@ -79,8 +81,10 @@ class AimaxhugClient:
     def get_with_status(self, path: str, params: Optional[dict] = None, **kwargs):
         """GET and return ``(http_status, parsed_json)`` without HTTP raising."""
         url = f"{BASE_URL}{path}" if path.startswith("/") else path
+        request_headers = dict(self.headers)
+        request_headers.update(kwargs.pop("headers", {}) or {})
         try:
-            resp = requests.get(url, headers=self.headers, params=params,
+            resp = requests.get(url, headers=request_headers, params=params,
                                 timeout=kwargs.pop("timeout", 120), **kwargs)
         except requests.exceptions.Timeout:
             raise AimaxhugError("请求超时（>120秒）", 0)

@@ -20,6 +20,7 @@ description: >
 | 音频生成 | 文生音频、文字生音频、语音合成、声音克隆、AI音频、text to speech、TTS、generate audio |
 | 百度搜索 | 百度搜索、AI搜索、联网搜索、网页搜索、搜索一下、web search、Baidu search、search the web |
 | 短视频解析 | 短视频解析、视频解析、解析视频、提取视频链接、解析抖音、解析小红书、parse video、video parse |
+| 社交媒体平台解析 | 自媒体平台解析、社交媒体平台解析、抖音账号搜索、抖音作品搜索、抖音榜单、抖音账号信息、抖音视频文案提取、小红书账号搜索、小红书作品搜索、小红书榜单 |
 | 文件上传 | 上传文件、上传图片、upload file、upload image |
 | 网页转图片 | 网页转图片、HTML转图片、网页截图、html to image、html screenshot |
 
@@ -35,6 +36,8 @@ scripts/
   video_parse.py        ← 短视频解析脚本（提取视频直链）
   html2image.py         ← HTML 转图片脚本
   upload.py              ← 上传脚本
+  social_media.py        ← 社交媒体平台解析脚本
+  xhs.py                 ← 小红书平台解析脚本
   shared/                ← 共享模块（config, client）
 references/
   ai_image.md            ← 生图参考文档
@@ -44,6 +47,20 @@ references/
   video_parse.md        ← 短视频解析参考文档
   html2image.md          ← HTML 转图片参考文档
   upload.md              ← 上传参考文档
+  social_media.md        ← 社交媒体平台解析参考文档
+  xhs.md                 ← 小红书平台解析参考文档
 ```
 
 读取 `SKILL.md` 按步骤执行。
+
+## 社交媒体平台解析
+
+触发词：自媒体平台解析、社交媒体数据、抖音账号搜索、抖音作品搜索、抖音榜单、抖音账号信息、抖音视频文案提取、小红书账号搜索、小红书作品搜索、小红书榜单、小红书评论、小红书视频文案。
+
+- Script: `scripts/social_media.py`
+- Reference: `references/social_media.md`
+- 当前功能：抖音账号、作品、榜单、用户、AI 作品搜索及视频文案提取，详见 `references/social_media.md`
+
+- Script: `scripts/xhs.py`
+- Reference: `references/xhs.md`
+- 当前功能：小红书账号、作品、榜单、评论、AI 作品搜索及视频文案提取，详见 `references/xhs.md`
