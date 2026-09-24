@@ -20,7 +20,7 @@ metadata:
       required: true
       description: Aimaxhug API Key，从 .env 文件或环境变量读取
   endpoints:
-    - https://base-api.aimaxhug.com
+    - https://base-api-2.aimaxhug.com
     - https://apis.aimaxhug.cloud
     - https://api.aimaxhug.cloud/social
 ---
