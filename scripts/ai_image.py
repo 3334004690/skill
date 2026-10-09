@@ -49,6 +49,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from shared.client import AimaxhugClient, AimaxhugError
+from shared.markers import mark_url
 
 GENERATE_ENDPOINT = "/api/v1/imageToImage"
 UPLOAD_ENDPOINT = "/api/v2/upload/file"
@@ -281,6 +282,7 @@ def generate_one(client, model, body, index, total):
     return {
         "success": True,
         "image_url": url,
+        "markedUrl": mark_url(url, "image"),
         "prompt": prompt_text,
         "style_label": style_label,
         "index": index,
@@ -494,6 +496,7 @@ def _display_results(results, model, proportion, input_data, json_output):
             output.append({
                 "success": r["success"],
                 "image_url": r.get("image_url", ""),
+                "markedUrl": r.get("markedUrl", ""),
                 "error": r.get("error", ""),
                 "prompt": r.get("prompt", ""),
                 "style_label": r.get("style_label", ""),
@@ -512,6 +515,7 @@ def _display_results(results, model, proportion, input_data, json_output):
         print("✅ 生成成功！")
         print("━" * 40)
         print(f"  📍 {r['image_url']}")
+        print(f"  IMAGE_MARKED: {r['markedUrl']}")
         print(f"  🖼️  ![](r['image_url'])")
         print("━" * 40)
         print(f"  📐 比例: {proportion or '默认'}")
@@ -522,6 +526,7 @@ def _display_results(results, model, proportion, input_data, json_output):
             style_label = r.get("style_label") or f"图{i + 1}"
             print(f"━━━ [{i + 1}/{total}] {style_label} ━━━")
             print(f"  📍 {r['image_url']}")
+            print(f"  IMAGE_MARKED: {r['markedUrl']}")
             print(f"  🖼️  ![](r['image_url'])")
             print()
         print(f"🤖 模型: {model['name']} ({model['api_model']})")

@@ -16,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from shared.client import AimaxhugClient, AimaxhugError
+from shared.markers import mark_url
 
 AUDIO_ENDPOINT = "https://apis.aimaxhug.cloud/v1/minimax/audio"
 AUDIO_LONG_ENDPOINT = "https://apis.aimaxhug.cloud/v1/minimax/audio/long"
@@ -88,6 +89,7 @@ def _extract_result(data):
         raise AimaxhugError("响应数据中没有音频 URL")
     return {
         "url": url,
+        "markedUrl": mark_url(url, "audio"),
         "model": payload.get("model", ""),
         "usage_characters": payload.get("usage_characters", payload.get("usageCharacters", 0)),
     }

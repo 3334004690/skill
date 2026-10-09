@@ -24,6 +24,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from shared.client import AimaxhugClient, AimaxhugError
+from shared.markers import mark_url
 from ai_audio import audio_duration
 
 VIDEO_ENDPOINT = "https://apis.aimaxhug.cloud/v1/videos"
@@ -381,6 +382,7 @@ def cmd_run(args):
     result = {
         "success": True,
         "video_url": video_url,
+        "markedUrl": mark_url(video_url, "video"),
         "task_id": task_id or _task_id(response),
         "model": args.model,
         "prompt": body["prompt"],

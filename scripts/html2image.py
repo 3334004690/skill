@@ -11,6 +11,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from shared.config import load_config
+from shared.markers import mark_url
 
 CONVERT_ENDPOINT = "https://apis.aimaxhug.cloud/api/convert/file"
 
@@ -62,7 +63,7 @@ def main():
         return 1
 
     if args.json:
-        print(json.dumps({"success": True, "url": url}, ensure_ascii=False, indent=2))
+        print(json.dumps({"success": True, "url": url, "markedUrl": mark_url(url, "image")}, ensure_ascii=False, indent=2))
     else:
         print(f"📍 {url}")
         print(f"🖼️  ![]({url})")

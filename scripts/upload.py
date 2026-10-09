@@ -26,6 +26,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from shared.client import AimaxhugClient, AimaxhugError
 from shared.config import load_config
+from shared.markers import mark_url
 
 UPLOAD_ENDPOINT = "/api/v2/upload/file"
 
@@ -60,6 +61,8 @@ def cmd_run(args):
             print(f"Error: 上传失败: {e}", file=sys.stderr)
             sys.exit(1)
 
+        resource_type = mime_type.split('/', 1)[0] if mime_type.split('/', 1)[0] in ('image', 'video', 'audio') else 'file'
+        data['markedUrl'] = mark_url(data['tmp_url'], resource_type)
         results.append(data)
         print(f"   ✅ {data['tmp_url']}", file=sys.stderr)
         print(f"      ![]({data['tmp_url']})", file=sys.stderr)
