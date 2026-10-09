@@ -9,6 +9,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
+from scripts.shared.markers import mark_url
 from shared.client import AimaxhugClient, AimaxhugError
 
 VIDEO_PARSE_ENDPOINT = "https://apis.aimaxhug.cloud/v1/video-parse"
@@ -69,6 +70,8 @@ def cmd_run(args):
     print(f"🌐 平台: {result.get('platform') or '未提供'}")
     print(f"📍 视频直链: {result['url']}")
     print(f"🔗 [点击播放]({result['url']})")
+    print(f"  FILE_MARKED: {mark_url(result['url'], "file")}")
+
     if result.get("request_id"):
         print(f"请求 ID: {result['request_id']}")
 

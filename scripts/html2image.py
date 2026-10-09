@@ -11,6 +11,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from shared.config import load_config
+from shared.download import download_to_local, env_save_dir
 from shared.markers import mark_url
 
 CONVERT_ENDPOINT = "https://apis.aimaxhug.cloud/api/convert/file"
@@ -62,11 +63,25 @@ def main():
         print(f"Error: {exc}", file=sys.stderr)
         return 1
 
+    # 宿主注入 SKILL_OUTPUT_DIR 时下载到该目录（agent 直接引用本地路径，无需自行下载）
+    save_dir = env_save_dir()
+    local_path = download_to_local(url, save_dir, 1, default_ext=".png") if save_dir else ""
+
     if args.json:
-        print(json.dumps({"success": True, "url": url, "markedUrl": mark_url(url, "image")}, ensure_ascii=False, indent=2))
+        print(json.dumps({
+            "success": True,
+            "url": url,
+            "local_path": local_path,
+            "markedUrl": mark_url(url, "image"),
+        }, ensure_ascii=False, indent=2))
     else:
+        if local_path:
+            print(f"💾 已保存: {local_path}")
+            print(f"IMAGE_SAVED: {local_path}")
         print(f"📍 {url}")
         print(f"🖼️  ![]({url})")
+        print(f"  IMAGE_MARKED: {mark_url(url, "image")}")
+
     return 0
 
 

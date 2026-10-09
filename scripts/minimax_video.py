@@ -24,6 +24,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from shared.client import AimaxhugClient, AimaxhugError
+from shared.download import download_to_local, env_save_dir
 from shared.markers import mark_url
 from ai_audio import audio_duration
 
@@ -390,11 +391,21 @@ def cmd_run(args):
         "ratio": args.ratio,
         "mode": mode,
     }
+    # 宿主注入 SKILL_OUTPUT_DIR 时下载到该目录（agent 直接引用本地路径，无需自行下载）
+    save_dir = env_save_dir()
+    if save_dir:
+        result["local_path"] = download_to_local(
+            video_url, save_dir, 1, default_ext=".mp4", timeout=300
+        ) or ""
     if args.json:
         print(json_mod.dumps(result, ensure_ascii=False, indent=2))
     else:
         print("\n✅ 视频生成成功！")
+        if result.get("local_path"):
+            print(f"💾 已保存: {result['local_path']}")
+            print(f"VIDEO_SAVED: {result['local_path']}")
         print(f"📍 {video_url}")
+        print(f"  IMAGE_MARKED: {result['markedUrl']}")
         print(f"🎬 [点击播放]({video_url})")
         print(f"🤖 模型: {args.model}")
         print(f"📋 模式: {mode}")

@@ -49,6 +49,7 @@ import requests
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from shared.client import AimaxhugClient, AimaxhugError
+from shared.download import download_to_local, env_save_dir
 from shared.markers import mark_url
 
 GENERATE_ENDPOINT = "/api/v1/imageToImage"
@@ -269,6 +270,10 @@ def generate_one(client, model, body, index, total):
     # Re-upload so the image displays inline regardless of source URL type
     url = _ensure_direct_url(client, url)
 
+    # 宿主注入 SKILL_OUTPUT_DIR 时下载到该目录（agent 直接引用本地路径，无需自行下载）
+    save_dir = env_save_dir()
+    local_path = download_to_local(url, save_dir, index, default_ext=".png") if save_dir else ""
+
     # Extract a short style label for display
     prompt_text = body.get("prompt", "")
     style_label = ""
@@ -282,6 +287,7 @@ def generate_one(client, model, body, index, total):
     return {
         "success": True,
         "image_url": url,
+        "local_path": local_path,
         "markedUrl": mark_url(url, "image"),
         "prompt": prompt_text,
         "style_label": style_label,
@@ -496,6 +502,7 @@ def _display_results(results, model, proportion, input_data, json_output):
             output.append({
                 "success": r["success"],
                 "image_url": r.get("image_url", ""),
+                "local_path": r.get("local_path", ""),
                 "markedUrl": r.get("markedUrl", ""),
                 "error": r.get("error", ""),
                 "prompt": r.get("prompt", ""),
@@ -514,6 +521,8 @@ def _display_results(results, model, proportion, input_data, json_output):
         r = successes[0]
         print("✅ 生成成功！")
         print("━" * 40)
+        if r.get("local_path"):
+            print(f"  💾 已保存: {r['local_path']}")
         print(f"  📍 {r['image_url']}")
         print(f"  IMAGE_MARKED: {r['markedUrl']}")
         print(f"  🖼️  ![](r['image_url'])")
@@ -525,12 +534,19 @@ def _display_results(results, model, proportion, input_data, json_output):
         for i, r in enumerate(successes):
             style_label = r.get("style_label") or f"图{i + 1}"
             print(f"━━━ [{i + 1}/{total}] {style_label} ━━━")
+            if r.get("local_path"):
+                print(f"  💾 已保存: {r['local_path']}")
             print(f"  📍 {r['image_url']}")
             print(f"  IMAGE_MARKED: {r['markedUrl']}")
             print(f"  🖼️  ![](r['image_url'])")
             print()
         print(f"🤖 模型: {model['name']} ({model['api_model']})")
         print(f"📐 比例: {proportion or '默认'}")
+
+    # Machine-readable marker: locally saved artifacts, consumed by the host app.
+    for _, r in results:
+        if r["success"] and r.get("local_path"):
+            print(f"IMAGE_SAVED: {r['local_path']}")
 
     if failures:
         print(f"\n⚠️ {len(failures)} 张生成失败:")

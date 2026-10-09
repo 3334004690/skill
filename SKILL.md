@@ -263,6 +263,9 @@ python scripts/minimax_video.py run --model minimax-h3-pro-768p --prompt "提示
 1. 图片链接放在最前面（URL 单独一行 + markdown 图片语法各一行，让平台自动展示）
 2. 关键元数据：比例、分辨率、模型
 3. 提供调整选项
+4. **本地保存** — 检测到环境变量 `SKILL_OUTPUT_DIR` 时，脚本会自动把产物下载到该目录并输出
+   `IMAGE_SAVED / AUDIO_SAVED / VIDEO_SAVED: <绝对路径>` 标记行；直接引用该本地路径汇报即可，
+   **不要自行下载文件到工作区根目录**
 
 ---
 

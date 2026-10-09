@@ -16,6 +16,7 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from shared.client import AimaxhugClient, AimaxhugError
+from shared.download import download_to_local, env_save_dir
 from shared.markers import mark_url
 
 AUDIO_ENDPOINT = "https://apis.aimaxhug.cloud/v1/minimax/audio"
@@ -164,11 +165,22 @@ def cmd_run(args):
     result["model"] = result["model"] or args.model
     result["endpoint"] = endpoint
     result["usage_characters"] = result["usage_characters"] or len(prompt)
+    # 宿主注入 SKILL_OUTPUT_DIR 时下载到该目录（agent 直接引用本地路径，无需自行下载）
+    save_dir = env_save_dir()
+    if save_dir:
+        result["local_path"] = download_to_local(
+            result["url"], save_dir, 1, default_ext=".mp3"
+        ) or ""
     if args.json:
         print(json_mod.dumps(result, ensure_ascii=False, indent=2))
     else:
         print("\n✅ 音频生成成功！")
+        if result.get("local_path"):
+            print(f"💾 已保存: {result['local_path']}")
+            print(f"AUDIO_SAVED: {result['local_path']}")
         print(f"📍 {result['url']}")
+        print(f"  AUDIO_MARKED: {result['markedUrl']}")
+
         print(f"🔊 [点击播放]({result['url']})")
         print(f"🤖 模型: {result['model']}")
         print(f"📝 字符数: {result['usage_characters']}")
