@@ -5,7 +5,7 @@ from typing import Optional
 
 import requests
 
-from .config import load_config
+from shared_config import load_config
 
 BASE_URL = "https://base-api.aimaxhug.com"
 

@@ -11,7 +11,7 @@ from urllib.parse import urlparse
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from shared.client import AimaxhugClient, AimaxhugError
+from shared_client import AimaxhugClient, AimaxhugError
 
 SOCIAL_API_PREFIX = "https://apis.aimaxhug.cloud/social"
 SORT_TYPES = ("_0", "_2", "_4")

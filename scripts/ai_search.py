@@ -8,7 +8,7 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from shared.client import AimaxhugClient, AimaxhugError
+from shared_client import AimaxhugClient, AimaxhugError
 
 SEARCH_ENDPOINT = "https://apis.aimaxhug.cloud/v1/ai_search"
 

@@ -9,8 +9,8 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from scripts.shared.markers import mark_url
-from shared.client import AimaxhugClient, AimaxhugError
+from shared_markers import mark_url
+from shared_client import AimaxhugClient, AimaxhugError
 
 VIDEO_PARSE_ENDPOINT = "https://apis.aimaxhug.cloud/v1/video-parse"
 SUPPORTED_PLATFORMS = (

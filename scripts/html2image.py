@@ -10,9 +10,9 @@ import requests
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from shared.config import load_config
-from shared.download import download_to_local, env_save_dir
-from shared.markers import mark_url
+from shared_config import load_config
+from shared_download import download_to_local, env_save_dir
+from shared_markers import mark_url
 
 CONVERT_ENDPOINT = "https://apis.aimaxhug.cloud/api/convert/file"
 

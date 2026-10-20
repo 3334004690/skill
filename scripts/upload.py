@@ -24,9 +24,9 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from shared.client import AimaxhugClient, AimaxhugError
-from shared.config import load_config
-from shared.markers import mark_url
+from shared_client import AimaxhugClient, AimaxhugError
+from shared_config import load_config
+from shared_markers import mark_url
 
 UPLOAD_ENDPOINT = "/api/v2/upload/file"
 

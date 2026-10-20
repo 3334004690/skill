@@ -6,7 +6,7 @@ description: >
   所有功能在 SKILL.md，脚本在 scripts/。
 ---
 
-# AI 媒体生成 — 技能索引
+# aimaxhug AI 媒体工具 — 技能索引
 
 ## 触发条件
 
@@ -26,25 +26,33 @@ description: >
 
 ## 文件结构
 
+交付目录仅保留两层（根目录和一级子目录），`SKILL.md` 为主入口，包含平台要求的版本、显示名称及中英文描述。
+
 ```
 SKILL.md                 ← 主技能入口（AI 读取）
+INDEX.md                 ← 技能索引
+AUTH.md                  ← API 授权配置说明
 scripts/
   ai_image.py            ← 生图脚本
   minimax_video.py       ← 视频生成脚本（即梦 Seedance 2.0/2.5 Pro + MiniMax H3）
   ai_audio.py            ← 文生音频和声音克隆脚本（MiniMax Speech 2.8）
   ai_search.py           ← 百度 AI 搜索脚本（支持 GET / POST）
-  video_parse.py        ← 短视频解析脚本（提取视频直链）
-  html2image.py         ← HTML 转图片脚本
+  video_parse.py         ← 短视频解析脚本（提取视频直链）
+  html2image.py          ← HTML 转图片脚本
   upload.py              ← 上传脚本
   social_media.py        ← 社交媒体平台解析脚本
   xhs.py                 ← 小红书平台解析脚本
-  shared/                ← 共享模块（config, client）
+  shared_config.py       ← API Key 配置与项目路径
+  shared_client.py       ← 公共 API 客户端
+  shared_download.py     ← 产物下载与本地保存
+  shared_markers.py      ← 宿主资源标记
+  requirements.txt      ← Python 依赖
 references/
   ai_image.md            ← 生图参考文档
   minimax_video.md       ← 视频生成参考文档（即梦 Seedance + MiniMax H3）
   ai_audio.md            ← 音频生成参考文档
   ai_search.md           ← 百度搜索参考文档
-  video_parse.md        ← 短视频解析参考文档
+  video_parse.md         ← 短视频解析参考文档
   html2image.md          ← HTML 转图片参考文档
   upload.md              ← 上传参考文档
   social_media.md        ← 社交媒体平台解析参考文档
