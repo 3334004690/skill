@@ -1,6 +1,6 @@
 ---
 name: aimaxhug-generation
-version: 1.0.0
+version: 1.0.1
 display_name: aimaxhug AI 媒体工具
 display_name_en: aimaxhug AI Media Toolkit
 description_zh: 使用项目内的 Python CLI，通过 Aimaxhug API 生成和编辑图片、生成视频与音频、克隆声音、上传文件、将 HTML 转为图片，并进行百度联网搜索、短视频链接解析及抖音/小红书数据查询。
