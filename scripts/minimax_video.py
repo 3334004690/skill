@@ -29,12 +29,9 @@ import time
 from pathlib import Path
 from urllib.parse import urlparse
 
-import requests
-
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from shared_client import AimaxhugClient, AimaxhugError
-from shared_download import download_to_local, env_save_dir
+from shared_client import AimaxhugClient, AimaxhugError, require_requests
 from shared_markers import mark_url
 from ai_audio import audio_duration
 
@@ -151,6 +148,7 @@ def _duration_from_bytes(content, suffix):
 
 def _duration_from_source(value, label):
     """Read duration for a local file, direct URL, or base64 data URI."""
+    requests = require_requests()
     value = value.strip()
     if not value.startswith(("http://", "https://", "data:")):
         return _local_media_duration(Path(value), label)
@@ -608,7 +606,7 @@ def _mode_for(model, args):
 # Commands
 # ---------------------------------------------------------------------------
 def cmd_list_models(_args):
-    print("可用视频模型：")
+    print("当前 CLI 已接入的视频模型与本地参数范围（非平台实时能力）：")
     print("\n  即梦 Seedance：")
     for key, model in VIDEO_MODELS.items():
         if model["family"] != "seedance":
@@ -716,6 +714,7 @@ def cmd_run(args):
         "mode": mode,
     }
     # 宿主注入 SKILL_OUTPUT_DIR 时下载到该目录（agent 直接引用本地路径，无需自行下载）
+    from shared_download import download_to_local, env_save_dir
     save_dir = env_save_dir()
     if save_dir:
         result["local_path"] = download_to_local(

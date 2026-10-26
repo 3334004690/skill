@@ -21,18 +21,26 @@ PROJECT_ROOT = Path(__file__).resolve().parent.parent
 ENV_PATH = PROJECT_ROOT / ".env"
 
 
-def load_config() -> dict:
-    """Return dict with api_key, or exit with helpful error message."""
+def find_api_key():
+    """Return the configured key, or None; never print or write credentials."""
     key = os.environ.get("AIMAXHUG_API_KEY", "").strip()
     if key:
-        return {"api_key": key}
+        return key
 
     if ENV_PATH.exists():
         for line in ENV_PATH.read_text(encoding="utf-8").strip().splitlines():
             if line.startswith("AIMAXHUG_API_KEY="):
                 key = line.split("=", 1)[1].strip()
                 if key:
-                    return {"api_key": key}
+                    return key
+    return None
+
+
+def load_config() -> dict:
+    """Return dict with api_key, or exit with helpful error message."""
+    key = find_api_key()
+    if key:
+        return {"api_key": key}
 
     print(
         "Error: API key not found.\n\n"

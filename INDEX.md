@@ -41,6 +41,7 @@ scripts/
   upload.py              ← 上传脚本
   social_media.py        ← 社交媒体平台解析脚本
   xhs.py                 ← 小红书平台解析脚本
+  preflight.py           ← 本地依赖/鉴权配置自检，可安装已声明依赖
   shared_config.py       ← API Key 配置与项目路径
   shared_client.py       ← 公共 API 客户端
   shared_download.py     ← 产物下载与本地保存

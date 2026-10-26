@@ -1,6 +1,6 @@
 ---
 name: aimaxhug-generation
-version: 1.0.1
+version: 1.0.2
 display_name: aimaxhug AI 媒体工具
 display_name_en: aimaxhug AI Media Toolkit
 description_zh: 使用项目内的 Python CLI，通过 Aimaxhug API 生成和编辑图片、生成视频与音频、克隆声音、上传文件、将 HTML 转为图片，并进行百度联网搜索、短视频链接解析及抖音/小红书数据查询。
@@ -60,6 +60,20 @@ AI 执行任何命令前，先 cd 到项目根目录。
 
 交付目录共两层：根目录存放 Markdown 入口与授权说明，`scripts/` 存放脚本及 `shared_*.py` 公共模块，`references/` 存放参考文档。两个子目录内均不再嵌套目录。
 
+## 环境自检与执行依据
+
+首次使用当前环境时，先运行无需第三方依赖的本地自检：
+
+```bash
+python scripts/preflight.py
+# 缺依赖时，使用同一个 Python 解释器安装项目已声明的依赖，再自检
+python scripts/preflight.py --install-deps
+```
+
+自检不发送 API 请求、不输出密钥、不创建或改写 `.env`。安装失败时报告具体原因和安装命令；缺 Key 时明确说明 `AIMAXHUG_API_KEY` 未配置，配置方式见 [AUTH.md](AUTH.md)。本地 `list-models` 不需要 Key；缺 Key 只阻塞需要鉴权的调用，仍可整理素材、校验配置和完成不依赖网络的交付。
+
+参数依据分为用户提供的事实、当前 CLI 的本地校验规则、实际查阅的官方接口说明或响应。视频能力有争议时先按 [minimax_video.md](references/minimax_video.md) 的来源说明核对；不得把本地脚本暂未暴露的参数说成产品绝对不支持，也不得仅凭评测意见放宽脚本校验。数字和能力结论附实际来源链接；未能核实的部分直接说明，不能假称已联网核实。
+
 ---
 
 ## 与用户交流风格
@@ -68,13 +82,14 @@ AI 执行任何命令前，先 cd 到项目根目录。
 
 1. **回复简短** — 直接给出结果或下一步，一句话能说清不用三句。
 2. **说人话** — 避免 API 术语、终端命令、JSON 等，除非用户主动问。
-3. **不需要用户操作终端** — AI 自己运行脚本，用户只需选择模型和说需求。
+3. **不需要用户操作终端** — AI 自己运行脚本、修复已声明依赖；密钥由用户或管理员预先配置。
 4. **不发浏览器弹窗** — 所有链接直接发给用户点击。
-5. **生图前必须先展示模型表格** — 用 `list-models` 列出所有模型让用户选择，不能自己决定。
-6. **无 API Key 时停止** — 说明需要预先配置 `AIMAXHUG_API_KEY`；禁止运行时写入 `.env`、提示词文件或临时脚本。
+5. **展示模型与实际配置** — 用 `list-models` 获取本地模型表。用户已指定模型时直接使用；明确授权代选、自动配参或直接提交时按需求和默认值选择并继续，无需再次等待选择。只有影响结果且无法推断的关键选择才询问。
+6. **无 API Key 时不调用鉴权接口** — 明确报告缺少 `AIMAXHUG_API_KEY`，继续完成本地可做部分；禁止运行时写入 `.env`、提示词文件或临时调用脚本，也不能伪造密钥或提交结果。
 7. **结果导向** — 生成完成后直接展示图片链接，中间过程不啰嗦。
 8. **不提额外注册** — api.aimaxhug.cloud 注册页面即含登录+注册。
 9. **不要问"要不要"** — 明显需要的就去做，比如用户说"生图"直接走流程。
+10. **结论和证据清楚** — 先说已完成或当前具体阻塞，再给实际参数对照表（含单位、取值和来源）。区分“已配参”“已提交（任务 ID）”“已完成（产物）”，不把候选方案当作可执行交付。
 
 ---
 
@@ -82,7 +97,7 @@ AI 执行任何命令前，先 cd 到项目根目录。
 
 | 模块 | 脚本 | 参考文档 | 说明 |
 |------|------|---------|------|
-| AI 图像生成 | `scripts/ai_image.py` | [ai_image.md](references/ai_image.md) | 文生图、图生图，支持 5 个模型 |
+| AI 图像生成 | `scripts/ai_image.py` | [ai_image.md](references/ai_image.md) | 文生图、图生图，支持 7 个模型 |
 | AI 视频生成 | `scripts/minimax_video.py` | [minimax_video.md](references/minimax_video.md) | 即梦 Seedance 2.0/2.5 Pro + MiniMax H3，支持文生视频、参考素材、图生视频、首尾帧和参考视频驱动 |
 | 文件上传 | `scripts/upload.py` | [upload.md](references/upload.md) | 上传本地文件，返回临时 URL |
 | AI 音频生成 | `scripts/ai_audio.py` | [ai_audio.md](references/ai_audio.md) | 文生音频、音色描述、声音克隆，支持 MiniMax Speech 2.8 |
@@ -103,7 +118,13 @@ python scripts/ai_audio.py list-models
 python scripts/ai_audio.py run --model speech-2.8-turbo --prompt "要朗读的文本" --sys-prompt "温柔知性的女声，吐字清晰"
 ```
 
-支持模型：`speech-2.8-turbo`、`speech-2.8-hd`。普通文生音频使用 `/v1/minimax/audio`；文本超过 5000 字或用户要求万字音频时，使用 `--long` 调用 `/v1/minimax/audio/long`（最多约 10000 字）。声音克隆时只能通过 `--input-audio` 传入一个本地音频文件，且时长必须大于 10 秒、小于 2 分钟；脚本会先复用 `scripts/upload.py` 对应的 `/api/v2/upload/file` 上传接口，再将返回 URL 作为单元素 `file` 数组传给 `/v1/minimax/audio/long`，传入声音样本会自动选择该接口。
+支持模型：`speech-2.8-turbo`、`speech-2.8-hd`。执行前读取 [ai_audio.md](references/ai_audio.md)，同时核对以下规则：
+
+- **文本与路由**：当前 CLI 对实际 `prompt.strip()` 用 Python `len()` 计数，本地上限为 **10000 字符**。超过 **5000 字符**、指定 `--long` 或声音克隆时走 `/v1/minimax/audio/long`；其余走 `/v1/minimax/audio`。这些是当前 CLI 规则，不代表服务端的完整上限；只有用户报出的“字数”或片段时，不能保证全文可提交。
+- **样本**：声音克隆只能通过 `--input-audio` 传 **1 个实际存在的本地音频文件**，实测时长须满足 **10 秒 < 时长 < 120 秒**。不得直接拿缺失文件或超长样本提交；如需裁剪/改变样本，应先遵循用户已有授权，不能擅自改变其素材要求。
+- **上传顺序**：脚本先调用 `/api/v2/upload/file`（与 `scripts/upload.py` 相同的上传接口），再把返回 URL 放入单元素 `file` 数组，并调用 `/v1/minimax/audio/long`，无需另行重复上传。
+
+在参数对照表中列出实际字符数、选用接口、样本数量、实测时长和上传引用方式；完整文案、样本或必要授权缺失时准确说明，继续处理与该阻塞无关的任务，不得声称已经克隆。复用已有授权：用户明确要求克隆自己的声音即为本次使用授权，不额外索取证明或重复确认。
 
 ## 百度搜索
 
@@ -142,16 +163,16 @@ python scripts/html2image.py <file.html>
 
 ### 一、图像生成
 
-**必须按以下顺序执行：**
+**按以下流程执行，并复用用户已有选择和授权：**
 
-**第一步 — 展示模型表格（必须！）**
+**第一步 — 获取模型与参数范围**
 
 ```bash
 cd <项目根目录>
 python scripts/ai_image.py list-models
 ```
 
-展示后等待用户选择模型、比例、分辨率。
+用户尚未选择且未授权代选时展示模型表并询问必要选择；已指定模型或要求直接执行时，展示所选模型与配置后继续。缺少可使用默认值的参数时补齐并说明，不重复确认。
 
 **第二步 — 执行生图**
 
@@ -187,7 +208,9 @@ python scripts/ai_image.py run --model nano-banana --prompt "一只猫" --count 
 
 ### 二、视频生成（即梦 Seedance + MiniMax H3）
 
-视频生成支持两个系列：**即梦 Seedance**（`seedance2-0-pro-2`、`seedance2-5-pro-2`）与 **MiniMax H3**（`minimax-h3-*`）。先展示模型表格，再等待用户选择模型、时长、画幅、分辨率（即梦）和参考素材。运行时只能调用已定义的 `scripts/minimax_video.py`，禁止创建或执行临时的 `run_video.py`、`video_prompt.txt` 等脚本/提示词文件，也禁止为了绕过错误自行写入 `.env`。参数或素材有任何问题时直接停止，不提交任务。
+视频生成支持两个系列：**即梦 Seedance**（`seedance2-0-pro-2`、`seedance2-5-pro-2`）与 **MiniMax H3**（`minimax-h3-*`）。先用 `list-models` 获取当前 CLI 的参数范围；用户已指定模型或授权配参、直接提交时，按需求配齐参数并执行，不再等待选择。运行时只能调用已定义的 `scripts/minimax_video.py`，禁止创建或执行临时的 `run_video.py`、`video_prompt.txt` 等脚本/提示词文件，也禁止为了绕过错误自行写入 `.env`。
+
+遇到参数或素材问题，先检查路径、参数名、默认值及当前接口依据，修正授权范围内不改变目标的配置问题。仍有缺失素材、鉴权或本地校验冲突时，仅暂停受影响的提交并明确原因，继续其他独立可执行任务。不能为了凑出可执行方案，擅自换模型、改变时长、删参考图或把首尾帧控制降为普通参考图；也不能把 CLI 的限制直接归结为产品能力缺失。
 
 ```bash
 cd <项目根目录>
@@ -223,7 +246,7 @@ python scripts/minimax_video.py run --model minimax-h3-2k --prompt "提示词" -
 python scripts/minimax_video.py run --model minimax-h3-pro-768p --prompt "提示词" --reference-videos source.mp4 --duration 5 --ratio 16:9
 ```
 
-> **参数速查**：
+> **当前 CLI 参数速查**（本地规则，非服务端全部能力；争议项及在线来源见参考文档）：
 >
 > | 参数 | 即梦 Seedance | MiniMax H3 |
 > |------|--------------|------------|
@@ -267,15 +290,16 @@ python scripts/minimax_video.py run --model minimax-h3-pro-768p --prompt "提示
 |------|---------|
 | 默认首选 | **即梦 Seedance 2.0 Pro**（`seedance2-0-pro-2`）— 4-15 秒，支持图片 / 视频 / 音频参考 |
 | 更长时长 | **即梦 Seedance 2.5 Pro**（`seedance2-5-pro-2`）— 15 / 30 秒，仅图片参考 |
-| 首尾帧 / 参考视频驱动 | **MiniMax H3 Pro**（`minimax-h3-pro-768p` / `minimax-h3-pro-2k`） |
+| 当前 CLI 的首尾帧 / 参考视频驱动 | **MiniMax H3 Pro**（`minimax-h3-pro-768p` / `minimax-h3-pro-2k`）；不据此断言其他产品无首尾帧能力 |
 
 ---
 
 ## 执行前检查清单
 
-1. **确认参数完整** — 模型、提示词、比例、分辨率（如适用）是否齐全
-2. **比例选择** — 如果用户没说，问一下要什么比例（16:9、1:1、9:16 等）
-3. **首次生成确认** — 第一次执行前告知用户方案并确认
+1. **核对参数与素材** — 按本次模块参考文档检查模型、实际提示词、时长、比例、分辨率及素材；区分实际检查值与用户口述值。
+2. **复用授权并补齐参数** — 用户给定参数优先；已授权自动配参时采用适用默认值并列明。只有无法推断且会改变目标的缺失项才询问，不以首次生成为由重复确认。
+3. **按授权执行并处理局部阻塞** — 用户要求直接提交即构成该范围内的执行授权；沙箱/免确认不意味着可以省略真实 Key、必要素材或绕过校验。条件齐全就提交并报告任务 ID、持续轮询；有阻塞就写明具体缺失项，完成可独立执行部分及已核实的参数配置，不只抛回一组待选方案。
+4. **交付可复核结果** — 用户要求文件时在 `output/` 或指定目录保存实际参数表、对应 CLI 命令和执行状态（不得含密钥）。未齐备的配置明确列出待补项，不能标为“可直接执行”；文件中的命令需与实际参数一致。
 
 ---
 

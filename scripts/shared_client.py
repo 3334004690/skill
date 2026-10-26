@@ -3,11 +3,24 @@
 import sys
 from typing import Optional
 
-import requests
-
 from shared_config import load_config
 
 BASE_URL = "https://base-api.aimaxhug.com"
+
+
+def require_requests():
+    """Load the HTTP dependency only for API work, keeping model lists offline."""
+    try:
+        import requests
+    except ImportError:
+        print(
+            "Error: Missing requests dependency. From the skill root, run with the same Python:\n"
+            "  python scripts/preflight.py --install-deps\n"
+            "Or: python -m pip install -r scripts/requirements.txt",
+            file=sys.stderr,
+        )
+        sys.exit(2)
+    return requests
 
 
 class AimaxhugError(Exception):
@@ -30,6 +43,7 @@ class AimaxhugClient:
     """
 
     def __init__(self, api_key: Optional[str] = None):
+        self._requests = require_requests()
         if api_key:
             self._api_key = api_key
         else:
@@ -52,6 +66,7 @@ class AimaxhugClient:
 
     def post_with_status(self, path: str, json: Optional[dict] = None, **kwargs):
         """POST and return ``(http_status, parsed_json)`` without HTTP raising."""
+        requests = self._requests
         url = f"{BASE_URL}{path}" if path.startswith("/") else path
         request_headers = dict(self.headers)
         request_headers.update(kwargs.pop("headers", {}) or {})
@@ -80,6 +95,7 @@ class AimaxhugClient:
 
     def get_with_status(self, path: str, params: Optional[dict] = None, **kwargs):
         """GET and return ``(http_status, parsed_json)`` without HTTP raising."""
+        requests = self._requests
         url = f"{BASE_URL}{path}" if path.startswith("/") else path
         request_headers = dict(self.headers)
         request_headers.update(kwargs.pop("headers", {}) or {})
@@ -100,6 +116,7 @@ class AimaxhugClient:
 
     def post_file(self, path: str, file_path: str, mime_type: str, **kwargs) -> dict:
         """POST a multipart file upload and return parsed JSON."""
+        requests = self._requests
         url = f"{BASE_URL}{path}" if path.startswith("/") else path
         from pathlib import Path
         name = Path(file_path).name

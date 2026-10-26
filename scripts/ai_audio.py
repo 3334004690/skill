@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
 """Generate speech audio with MiniMax speech-2.8 models.
 
-Short text uses /v1/minimax/audio; long text (up to about 10,000 Chinese
-characters) uses /v1/minimax/audio/long. Local reference audio files are
+Short text uses /v1/minimax/audio; this CLI routes long text (up to 10,000
+characters after strip()) to /v1/minimax/audio/long. Local reference audio files are
 uploaded through the shared upload endpoint before voice cloning.
 """
 
@@ -16,7 +16,6 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from shared_client import AimaxhugClient, AimaxhugError
-from shared_download import download_to_local, env_save_dir
 from shared_markers import mark_url
 
 AUDIO_ENDPOINT = "https://apis.aimaxhug.cloud/v1/minimax/audio"
@@ -100,8 +99,9 @@ def cmd_list_models(_args):
     print("可用音频模型：")
     for key, name in AUDIO_MODELS.items():
         print(f"  [{key}] {name}")
-    print("\n模式：默认短文本；使用 --long、文本超过 5000 字或声音克隆时调用万字接口。")
+    print("\n本地文本限制：strip() 后最多 10000 字符；使用 --long、超过 5000 字符或声音克隆时调用 /audio/long。")
     print("声音克隆：使用 --input-audio 传入一个本地音频文件，时长必须 >10 秒且 <120 秒。")
+    print("上传顺序：先调用 /api/v2/upload/file，再将 URL 作为单元素 file 数组提交 /audio/long。")
 
 
 def add_generate_args(parser):
@@ -148,7 +148,7 @@ def cmd_run(args):
         body["file"] = file_urls
 
     # Voice cloning uses the long endpoint so the uploaded file array is
-    # handled consistently and prompts up to about 10,000 chars are allowed.
+    # handled consistently, subject to this CLI's 10,000-character validation.
     use_long = args.long or len(prompt) > AUTO_LONG_THRESHOLD or bool(file_urls)
     endpoint = AUDIO_LONG_ENDPOINT if use_long else AUDIO_ENDPOINT
     if use_long:
@@ -166,6 +166,7 @@ def cmd_run(args):
     result["endpoint"] = endpoint
     result["usage_characters"] = result["usage_characters"] or len(prompt)
     # 宿主注入 SKILL_OUTPUT_DIR 时下载到该目录（agent 直接引用本地路径，无需自行下载）
+    from shared_download import download_to_local, env_save_dir
     save_dir = env_save_dir()
     if save_dir:
         result["local_path"] = download_to_local(

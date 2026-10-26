@@ -44,12 +44,9 @@ import time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-import requests
-
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from shared_client import AimaxhugClient, AimaxhugError
-from shared_download import download_to_local, env_save_dir
+from shared_client import AimaxhugClient, AimaxhugError, require_requests
 from shared_markers import mark_url
 
 GENERATE_ENDPOINT = "/api/v1/imageToImage"
@@ -237,6 +234,7 @@ def _ensure_direct_url(client, image_url):
     import tempfile
 
     try:
+        requests = require_requests()
         resp = requests.get(image_url, timeout=60)
         ct = (resp.headers.get("Content-Type") or "").split(";")[0].strip()
         if not ct.startswith("image/"):
@@ -258,6 +256,7 @@ def _ensure_direct_url(client, image_url):
 
 def generate_one(client, model, body, index, total):
     """Generate a single image. Returns dict with success/image_url/prompt."""
+    from shared_download import download_to_local, env_save_dir
     try:
         data = client.post(GENERATE_ENDPOINT, json=body)
     except AimaxhugError as e:
@@ -369,6 +368,7 @@ def add_generate_args(p):
 
 def cmd_run(args):
     """Generate image(s) and print result. Multi-image runs in parallel."""
+    require_requests()
     # Validate model
     model = MODELS.get(args.model)
     if not model:

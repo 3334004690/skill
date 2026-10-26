@@ -2,7 +2,22 @@
 
 视频生成通过异步接口提交任务并轮询到视频完成。支持两个系列：**即梦 Seedance** 与 **MiniMax H3**，由同一个脚本 `scripts/minimax_video.py` 提供。
 
-## Supported Models
+## 能力依据与模型标识
+
+下列模型表、字段映射和校验表描述的是 [当前 CLI](../scripts/minimax_video.py) 已实现的范围，不是即梦或 MiniMax 全部产品能力。先用 `list-models` 查看本地注册表，遇到首尾帧、时长或素材组合争议时，再核对用户指定的**完整模型 key**与官方来源，不能只按“2.5”等简称判断。
+
+公开来源（2026-10-26 查阅）：
+
+- [官方 Seedance 文档](https://docs.aimaxhug.cloud/js/data/seedance.js)：`seedance2-0-pro-2` 与 `Seedance-2.0-pro`、`Seedance-2.5` 等是不同条目。部分条目提供 `first_image_url` / `last_image_url` / `reference_image_urls`；因此不能笼统说“即梦没有首尾帧”，也不能把其他条目的参数直接混入现有 CLI。
+- [当前公开模型配置](https://apis.aimaxhug.cloud/v1/videos/models)：其中 `seedance2-0-pro-2` 的时长为 4–15 秒，`seedance2-5-pro-2` 为 15 / 30 秒。这里的结论只对应这两个 key，不能推出“8 秒只能使用即梦 2.0”。
+- [官方 MiniMax 文档](https://docs.aimaxhug.cloud/js/data/minimax.js)：`referenceImages` 与 `first_image` / `last_image` 互斥有明确文档依据，保留现有校验；不能仅因评测判错就删除。
+- [公开 OpenAPI](https://apis.aimaxhug.cloud/openapi.json)：`/v1/videos` 描述为参数原样透传，时长范围与默认值由上游决定。该描述未提供首尾帧与参考图互斥的字段 schema，不能用它单独证明此类组合一定可用或不可用。
+
+具体比对：Seedance 文档对象 `seedance-pro-2` 明确写 `seedance2-0-pro-2` 不支持 `first_image` / `last_image`；另一个对象 `seedance-2-5` 对应 **`Seedance-2.5`**，写明 4–15 秒、最多 30 张参考图及首尾帧 URL 参数。公开模型配置中两个旧 key 的 `channel_details.channel_3.internal_model` 仅列 `16:9 / 9:16 / 1:1`、默认 `720p`，旧 2.5 还列参考视频/音频数量各 3；这与本地注册表六种比例、默认 `480p`、旧 2.5 仅图片的范围有差异。当前 CLI 表不能作为实时模型配置引用；正式接入这些差异前，需核对模型/渠道和字段映射，保留现有业务校验。
+
+当前 CLI 未实现的官方模型或字段，应说明“当前脚本尚未接入”，并列出已核实的支持范围；不能擅自改模型、牺牲参考图或把首尾帧塞入普通参考图组后声称效果等价。需要接入新能力时应作为代码变更核对真实映射，再验证；运行生成任务时不得新建临时调用器绕过本地校验。无证据时保留冲突说明，不给出产品层面的绝对结论。
+
+## Supported Models（当前 CLI）
 
 ### 即梦 Seedance
 
@@ -32,7 +47,9 @@ MiniMax 时长 4–15 秒；画幅 `16:9` / `9:16` / `1:1` / `21:9` / `4:3` / `3
    - 即梦 Seedance: `GET https://apis.aimaxhug.cloud/v1/videos/{model}/{task_id}`
    - MiniMax H3: `GET https://apis.aimaxhug.cloud/v1/videos/minimax-h3/{task_id}`
 
-The predefined script performs all validation and polling. It never creates `.env`, prompt files, helper scripts, or alternate video-generation scripts at runtime. Any validation or API error stops the request before generation.
+The predefined script performs validation and polling. It never creates `.env`, prompt files, helper scripts, or alternate video-generation scripts at runtime. A local validation failure prevents that request from being submitted. Fix configuration issues within the user's existing authorization, and continue independent work if one request remains blocked. An error after a task ID has been returned must be handled by preserving the ID and checking task status rather than resubmitting blindly.
+
+用户已指定模型或明确授权代选、自动配参、直接提交时，展示所选参数（含单位及来源）后执行，无需再等待模型选择或首次生成确认。只有会改变目标且无法推断的关键输入缺失时才询问。缺 Key 时明确报告，完成本地参数检查；沙箱模式不等于有 Key，也不意味着可跳过素材和校验。
 
 If submission returns HTTP 400 but includes a `task_id`, the script preserves the task ID and continues polling. A 400 without a task ID is treated as a submission failure.
 
@@ -127,7 +144,7 @@ python {baseDir}/scripts/minimax_video.py run \
   --ratio 16:9
 ```
 
-## Request Mapping
+## Request Mapping（当前 CLI）
 
 | CLI option | 即梦 Seedance | MiniMax H3 | Constraint |
 |------------|--------------|------------|------------|
@@ -153,7 +170,9 @@ python {baseDir}/scripts/minimax_video.py run \
 
 两类模型不能混用对方的参数名：给即梦传 `--reference-images`、或给 MiniMax 传 `--images` / `--resolution`，脚本都会直接报错。
 
-## Validation Rules
+## Validation Rules（当前 CLI 本地校验）
+
+以下限制由现有脚本执行，未覆盖平台其他模型/调用方式。尤其 `--first-image` / `--last-image` 仅在本 CLI 的 MiniMax 分支提供，不能由此推断 Seedance 产品整体没有首尾帧能力。关于即梦 2.5 的素材支持，公开配置与本地注册表可能不同；生成任务仍按当前 CLI 校验执行并披露差异，不擅自放宽。
 
 - 即梦 2.5 只支持图片参考；视频 / 音频参考仅 2.0 支持。
 - 即梦 2.5 时长只能是 15 或 30 秒；即梦 2.0 与 MiniMax 为 4–15 秒。
