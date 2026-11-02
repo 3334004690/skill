@@ -1,6 +1,6 @@
 # Video Generation Module (即梦 Seedance + MiniMax H3)
 
-视频生成通过异步接口提交任务并轮询到视频完成。支持两个系列：**即梦 Seedance** 与 **MiniMax H3**，由同一个脚本 `scripts/minimax_video.py` 提供。
+本页说明 **即梦 Seedance** 与 **MiniMax H3** 的参数，使用 `scripts/minimax_video.py`。**Omni** 三个模型使用独立脚本 `scripts/omni_video.py`，其参数、约 10 秒输出特性和调用示例见 [omni_video.md](omni_video.md)；请求路径和任务查询方式沿用视频接口。
 
 ## 能力依据与模型标识
 
@@ -66,6 +66,7 @@ MiniMax 时长 4–15 秒；画幅 `16:9` / `9:16` / `1:1` / `21:9` / `4:3` / `3
 3. Poll until status is completed and a video URL is returned:
    - 即梦 Seedance: `GET https://apis.aimaxhug.cloud/v1/videos/{model}/{task_id}`
    - MiniMax H3: `GET https://apis.aimaxhug.cloud/v1/videos/minimax-h3/{task_id}`
+   - Omni: `GET https://apis.aimaxhug.cloud/v1/videos/{model}/{task_id}`
 
 The predefined script performs validation and polling. It never creates `.env`, prompt files, helper scripts, or alternate video-generation scripts at runtime. A local validation failure prevents that request from being submitted. Fix configuration issues within the user's existing authorization, and continue independent work if one request remains blocked. An error after a task ID has been returned must be handled by preserving the ID and checking task status rather than resubmitting blindly.
 
@@ -183,7 +184,7 @@ python {baseDir}/scripts/minimax_video.py run \
 | CLI option | 即梦 Seedance | MiniMax H3 | Constraint |
 |------------|--------------|------------|------------|
 | `--model` | `seedance2-0-pro-2` / `seedance2-5-pro-2` / `seedance-mini-2` | `minimax-h3-*` | One of the model keys above |
-| `--prompt` | `prompt` | `prompt` | Required; API silently truncates text beyond 7000 characters |
+| `--prompt` | `prompt` | `prompt` | Required; 这两个系列按既有 7000 字符接口规则处理；Omni 不受此本地上限约束 |
 | `--duration` | `duration` | `duration` | 2.0 / Mini 2 / MiniMax: 4–15 秒；2.5: 15 或 30 秒 |
 | `--ratio` | `aspect_ratio` | `ratio` | 即梦无 `adaptive`；MiniMax 含 `adaptive` |
 | `--resolution` | `resolution` | — | 即梦：`480p` / `720p`（默认 480p） |
@@ -219,4 +220,4 @@ python {baseDir}/scripts/minimax_video.py run \
 - MiniMax 参考视频仅 Pro 模型，且必须为 1 段 2–5 秒的源视频。
 - 2K 与参考视频请求在高峰期可能更慢；保持轮询直到完成或超时。
 - 内容策略由 API 强制；被拒的提示词通常在创建任务前以 HTTP 400 返回。若 400 响应仍带 `task_id`，脚本会保留该 ID 继续轮询。
-- 视频时长以 JSON 的 `duration` 字段为准；`prompt` 中的时长措辞需与之一致。MiniMax 使用 `ratio` 字段，即梦使用 `aspect_ratio` 字段。
+- 即梦 / MiniMax 的视频请求时长以 JSON 的 `duration` 字段为准；`prompt` 中的时长措辞需与之一致。MiniMax 使用 `ratio` 字段，即梦使用 `aspect_ratio` 字段。Omni 使用 `aspect_ratio` 与 `seconds` / `duration`，当前 Gemini 产物固定约 10 秒，不能把请求秒数当作实测时长。
