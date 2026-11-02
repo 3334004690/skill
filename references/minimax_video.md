@@ -6,14 +6,20 @@
 
 下列模型表、字段映射和校验表描述的是 [当前 CLI](../scripts/minimax_video.py) 已实现的范围，不是即梦或 MiniMax 全部产品能力。先用 `list-models` 查看本地注册表，遇到首尾帧、时长或素材组合争议时，再核对用户指定的**完整模型 key**与官方来源，不能只按“2.5”等简称判断。
 
-公开来源（2026-10-26 查阅）：
+本次参数依据（用户于 2026-11-02 提供，未重新联网核实）：
+
+- `seedance2-0-pro-2`：图片≤9 / 视频≤3 / 音频≤3，均仅接受公网 HTTPS URL。
+- `seedance2-5-pro-2`：图片≤30（支持人像）/ 视频≤10 / 音频≤10；素材输入保留原脚本的本地文件上传或公网 URL 方式。
+- `seedance-mini-2`：时长 4–15 秒、默认 5 秒、步长 1；画幅默认 16:9；分辨率 480p / 720p、默认 480p；图片≤9 / 视频≤3 / 音频≤3，均须公网 HTTPS URL；视频或音频参考须至少配一张图片，按秒计费。
+
+历史公开来源（2026-10-26 查阅；其中旧素材数量由上面的用户补充说明更新）：
 
 - [官方 Seedance 文档](https://docs.aimaxhug.cloud/js/data/seedance.js)：`seedance2-0-pro-2` 与 `Seedance-2.0-pro`、`Seedance-2.5` 等是不同条目。部分条目提供 `first_image_url` / `last_image_url` / `reference_image_urls`；因此不能笼统说“即梦没有首尾帧”，也不能把其他条目的参数直接混入现有 CLI。
 - [当前公开模型配置](https://apis.aimaxhug.cloud/v1/videos/models)：其中 `seedance2-0-pro-2` 的时长为 4–15 秒，`seedance2-5-pro-2` 为 15 / 30 秒。这里的结论只对应这两个 key，不能推出“8 秒只能使用即梦 2.0”。
 - [官方 MiniMax 文档](https://docs.aimaxhug.cloud/js/data/minimax.js)：`referenceImages` 与 `first_image` / `last_image` 互斥有明确文档依据，保留现有校验；不能仅因评测判错就删除。
 - [公开 OpenAPI](https://apis.aimaxhug.cloud/openapi.json)：`/v1/videos` 描述为参数原样透传，时长范围与默认值由上游决定。该描述未提供首尾帧与参考图互斥的字段 schema，不能用它单独证明此类组合一定可用或不可用。
 
-具体比对：Seedance 文档对象 `seedance-pro-2` 明确写 `seedance2-0-pro-2` 不支持 `first_image` / `last_image`；另一个对象 `seedance-2-5` 对应 **`Seedance-2.5`**，写明 4–15 秒、最多 30 张参考图及首尾帧 URL 参数。公开模型配置中两个旧 key 的 `channel_details.channel_3.internal_model` 仅列 `16:9 / 9:16 / 1:1`、默认 `720p`，旧 2.5 还列参考视频/音频数量各 3；这与本地注册表六种比例、默认 `480p`、旧 2.5 仅图片的范围有差异。当前 CLI 表不能作为实时模型配置引用；正式接入这些差异前，需核对模型/渠道和字段映射，保留现有业务校验。
+历史比对：Seedance 文档对象 `seedance-pro-2` 写 `seedance2-0-pro-2` 不支持 `first_image` / `last_image`；另一个对象 `seedance-2-5` 对应 **`Seedance-2.5`**，是不同的完整模型 key，不能混用参数。历史公开配置与本地注册表在比例、默认分辨率等处存在差异；本次仅依据用户说明更新素材规则并接入 Mini 2，其他既有配置保留。当前 CLI 表不能作为平台实时配置引用。
 
 当前 CLI 未实现的官方模型或字段，应说明“当前脚本尚未接入”，并列出已核实的支持范围；不能擅自改模型、牺牲参考图或把首尾帧塞入普通参考图组后声称效果等价。需要接入新能力时应作为代码变更核对真实映射，再验证；运行生成任务时不得新建临时调用器绕过本地校验。无证据时保留冲突说明，不给出产品层面的绝对结论。
 
@@ -23,10 +29,24 @@
 
 | Model key | Model | Duration | Resolution | Reference assets |
 |-----------|-------|----------|------------|------------------|
-| `seedance2-0-pro-2` | 即梦 Seedance 2.0 Pro | 4–15 秒 | 480p / 720p | 图片(≤9) / 视频(≤3) / 音频(≤3) |
-| `seedance2-5-pro-2` | 即梦 Seedance 2.5 Pro | 15 / 30 秒 | 480p / 720p | 图片(≤9) |
+| `seedance2-0-pro-2` | 即梦 Seedance 2.0 Pro | 4–15 秒（默认 5） | 480p / 720p | 图片(≤9) / 视频(≤3) / 音频(≤3)，仅公网 HTTPS URL |
+| `seedance2-5-pro-2` | 即梦 Seedance 2.5 Pro | 15 / 30 秒（默认 15） | 480p / 720p | 图片(≤30，支持人像) / 视频(≤10) / 音频(≤10) |
+| `seedance-mini-2` | 即梦 Seedance Mini 2 | 4–15 秒（默认 5，步长 1） | 480p / 720p | 图片(≤9) / 视频(≤3) / 音频(≤3)，仅公网 HTTPS URL；视频/音频须配图 |
 
-即梦画幅：`16:9` / `9:16` / `1:1` / `21:9` / `4:3` / `3:4`（**没有** `adaptive`）。
+即梦画幅：`16:9` / `9:16` / `1:1` / `21:9` / `4:3` / `3:4`（**没有** `adaptive`），默认 `16:9`。分辨率默认 `480p`。
+
+#### Seedance Mini 2 参数
+
+| 提交字段 | 类型 | 默认值 / 范围 | 说明 |
+|----------|------|---------------|------|
+| `model` | string | `seedance-mini-2` | 必填公开模型 ID；命令中使用 `--model seedance-mini-2` |
+| `prompt` | string | 非空 | 必填视频提示词；命令中使用 `--prompt` |
+| `duration` | integer | 默认 5；4–15，步长 1 | 视频秒数，按秒计费 |
+| `aspect_ratio` | enum | 默认 16:9；取值见上方画幅列表 | 命令中使用 `--ratio` |
+| `resolution` | enum | 默认 480p；480p / 720p | 输出分辨率 |
+| `images` | array | 可选，最多 9 张 | 公网 HTTPS 图片 URL |
+| `videos` | array | 可选，最多 3 段 | 公网 HTTPS 视频 URL；至少同时提供一张图片 |
+| `audios` | array | 可选，最多 3 个 | 公网 HTTPS 音频 URL；至少同时提供一张图片 |
 
 ### MiniMax H3
 
@@ -75,28 +95,42 @@ python {baseDir}/scripts/minimax_video.py run \
 
 ### 即梦 Seedance — Reference-Driven
 
+`media.example.com` 为示例占位域名，需替换为真实可访问的公网 HTTPS 素材直链。
+
 ```bash
 python {baseDir}/scripts/minimax_video.py run \
   --model seedance2-0-pro-2 \
   --prompt "保持人物动作节奏，改为电影级暖色调" \
-  --images photo1.jpg photo2.jpg \
-  --videos clip.mp4 \
-  --audios bgm.mp3 \
+  --images https://media.example.com/photo1.jpg https://media.example.com/photo2.jpg \
+  --videos https://media.example.com/clip.mp4 \
+  --audios https://media.example.com/bgm.mp3 \
   --duration 8 \
   --ratio 9:16 \
   --resolution 720p
 ```
 
-### 即梦 Seedance 2.5 — Long Duration
+### 即梦 Seedance 2.5 — Long Duration / 多素材参考
 
 ```bash
 python {baseDir}/scripts/minimax_video.py run \
   --model seedance2-5-pro-2 \
-  --prompt "人物在雨中缓慢行走，镜头跟随" \
+  --prompt "保持参考人像特征，参考动作与音乐节奏，人物在雨中缓慢行走" \
   --images portrait.jpg \
+  --videos clip.mp4 \
+  --audios bgm.mp3 \
   --duration 30 \
   --ratio 16:9 \
   --resolution 720p
+```
+
+### 即梦 Seedance Mini 2
+
+文生视频可以不传任何素材；使用视频或音频参考时必须至少提供一张公网 HTTPS 图片。
+
+```bash
+python {baseDir}/scripts/minimax_video.py run --model seedance-mini-2 --prompt "清晨海浪涌向沙滩" --duration 5 --ratio 16:9 --resolution 480p
+
+python {baseDir}/scripts/minimax_video.py run --model seedance-mini-2 --prompt "保持人物形象，参考动作和音乐节奏" --images https://media.example.com/person.jpg --videos https://media.example.com/action.mp4 --audios https://media.example.com/music.mp3 --duration 8 --ratio 9:16 --resolution 720p --json
 ```
 
 ### MiniMax H3 — Text-to-Video
@@ -148,14 +182,14 @@ python {baseDir}/scripts/minimax_video.py run \
 
 | CLI option | 即梦 Seedance | MiniMax H3 | Constraint |
 |------------|--------------|------------|------------|
-| `--model` | `seedance2-0-pro-2` / `seedance2-5-pro-2` | `minimax-h3-*` | One of the model keys above |
+| `--model` | `seedance2-0-pro-2` / `seedance2-5-pro-2` / `seedance-mini-2` | `minimax-h3-*` | One of the model keys above |
 | `--prompt` | `prompt` | `prompt` | Required; API silently truncates text beyond 7000 characters |
-| `--duration` | `duration` | `duration` | 2.0 / MiniMax: 4–15 秒；2.5: 15 或 30 秒 |
+| `--duration` | `duration` | `duration` | 2.0 / Mini 2 / MiniMax: 4–15 秒；2.5: 15 或 30 秒 |
 | `--ratio` | `aspect_ratio` | `ratio` | 即梦无 `adaptive`；MiniMax 含 `adaptive` |
 | `--resolution` | `resolution` | — | 即梦：`480p` / `720p`（默认 480p） |
-| `--images` | `images` | — | 即梦参考图，最多 9 个（URL 或本地文件） |
-| `--videos` | `videos` | — | 仅 2.0，最多 3 个（URL 或本地文件） |
-| `--audios` | `audios` | — | 仅 2.0，最多 3 个（URL 或本地文件） |
+| `--images` | `images` | — | 2.0 / Mini 2：≤9，公网 HTTPS URL；2.5：≤30，路径/URL，支持人像 |
+| `--videos` | `videos` | — | 2.0 / Mini 2：≤3，公网 HTTPS URL；2.5：≤10，路径/URL；Mini 2 须配图 |
+| `--audios` | `audios` | — | 2.0 / Mini 2：≤3，公网 HTTPS URL；2.5：≤10，路径/URL；Mini 2 须配图 |
 | `--reference-images` | — | `referenceImages` | MiniMax，最多 5 个（URL / data URI / 本地文件） |
 | `--reference-audios` | — | `referenceAudios` | MiniMax，最多 3 个且须配参考图 |
 | `--reference-videos` | — | `referenceVideos` | MiniMax Pro only；exactly one 2-5 second source video |
@@ -165,17 +199,20 @@ python {baseDir}/scripts/minimax_video.py run \
 
 ### 参考素材处理差异
 
-- **即梦**：本地文件先通过 `/api/v2/upload/file` 上传，拿到 URL 后放进 `images` / `videos` / `audios` 数组；公网直链可直接传入。不生成 data URI。
+- **即梦 2.0 / Mini 2**：`images` / `videos` / `audios` 仅接受公网 HTTPS URL，不接受本地文件、HTTP URL 或 data URI。脚本离线拒绝明显的本地主机及内网 IP；域名是否实际解析到公网、素材可达性及内容类型仍由调用方和接口验证。
+- **即梦 2.5**：本地文件先通过 `/api/v2/upload/file` 上传，拿到 URL 后放进对应素材数组；http(s) 公网直链可直接传入。不生成 data URI。
 - **MiniMax**：本地文件在内存中编码为 `data:<mime>;base64,...`；也可直接传公网 URL 或 data URI。脚本会预检参考音视频时长，无法校验文档中的限制时直接停止。
 
 两类模型不能混用对方的参数名：给即梦传 `--reference-images`、或给 MiniMax 传 `--images` / `--resolution`，脚本都会直接报错。
 
 ## Validation Rules（当前 CLI 本地校验）
 
-以下限制由现有脚本执行，未覆盖平台其他模型/调用方式。尤其 `--first-image` / `--last-image` 仅在本 CLI 的 MiniMax 分支提供，不能由此推断 Seedance 产品整体没有首尾帧能力。关于即梦 2.5 的素材支持，公开配置与本地注册表可能不同；生成任务仍按当前 CLI 校验执行并披露差异，不擅自放宽。
+以下限制由现有脚本执行，未覆盖平台其他模型/调用方式。尤其 `--first-image` / `--last-image` 仅在本 CLI 的 MiniMax 分支提供，不能由此推断 Seedance 产品整体没有首尾帧能力。2.0 / 2.5 的素材更新及 Mini 2 配置来源为本次用户提供的参数说明，未重新联网核实。
 
-- 即梦 2.5 只支持图片参考；视频 / 音频参考仅 2.0 支持。
-- 即梦 2.5 时长只能是 15 或 30 秒；即梦 2.0 与 MiniMax 为 4–15 秒。
+- 即梦 2.0：图片≤9 / 视频≤3 / 音频≤3，仅接受公网 HTTPS URL。
+- 即梦 2.5：图片≤30（支持人像）/ 视频≤10 / 音频≤10。
+- 即梦 Mini 2：图片≤9 / 视频≤3 / 音频≤3，仅接受公网 HTTPS URL；有视频或音频参考时，至少提供一张图片。此配图要求不扩展到 2.0 / 2.5。
+- 即梦 2.5 时长只能是 15 或 30 秒；即梦 2.0、Mini 2 与 MiniMax 为 4–15 秒。
 - MiniMax 文生视频不能使用 `ratio=adaptive`。
 - MiniMax `first_image` / `last_image` 与 `referenceImages` 互斥。
 - MiniMax 参考音频必须与参考图同时提供；最多 3 个，总时长不超过 15 秒。

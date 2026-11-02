@@ -1,6 +1,6 @@
 ---
 name: aimaxhug-generation
-version: 1.0.2
+version: 1.0.3
 display_name: aimaxhug AI 媒体工具
 display_name_en: aimaxhug AI Media Toolkit
 description_zh: 使用项目内的 Python CLI，通过 Aimaxhug API 生成和编辑图片、生成视频与音频、克隆声音、上传文件、将 HTML 转为图片，并进行百度联网搜索、短视频链接解析及抖音/小红书数据查询。
@@ -98,7 +98,7 @@ python scripts/preflight.py --install-deps
 | 模块 | 脚本 | 参考文档 | 说明 |
 |------|------|---------|------|
 | AI 图像生成 | `scripts/ai_image.py` | [ai_image.md](references/ai_image.md) | 文生图、图生图，支持 7 个模型 |
-| AI 视频生成 | `scripts/minimax_video.py` | [minimax_video.md](references/minimax_video.md) | 即梦 Seedance 2.0/2.5 Pro + MiniMax H3，支持文生视频、参考素材、图生视频、首尾帧和参考视频驱动 |
+| AI 视频生成 | `scripts/minimax_video.py` | [minimax_video.md](references/minimax_video.md) | 即梦 Seedance 2.0/2.5 Pro、Mini 2 + MiniMax H3，支持文生视频、参考素材、图生视频、首尾帧和参考视频驱动 |
 | 文件上传 | `scripts/upload.py` | [upload.md](references/upload.md) | 上传本地文件，返回临时 URL |
 | AI 音频生成 | `scripts/ai_audio.py` | [ai_audio.md](references/ai_audio.md) | 文生音频、音色描述、声音克隆，支持 MiniMax Speech 2.8 |
 | 百度 AI 搜索 | `scripts/ai_search.py` | [ai_search.md](references/ai_search.md) | 百度联网搜索，支持 GET / POST，返回可引用网页结果 |
@@ -208,7 +208,7 @@ python scripts/ai_image.py run --model nano-banana --prompt "一只猫" --count 
 
 ### 二、视频生成（即梦 Seedance + MiniMax H3）
 
-视频生成支持两个系列：**即梦 Seedance**（`seedance2-0-pro-2`、`seedance2-5-pro-2`）与 **MiniMax H3**（`minimax-h3-*`）。先用 `list-models` 获取当前 CLI 的参数范围；用户已指定模型或授权配参、直接提交时，按需求配齐参数并执行，不再等待选择。运行时只能调用已定义的 `scripts/minimax_video.py`，禁止创建或执行临时的 `run_video.py`、`video_prompt.txt` 等脚本/提示词文件，也禁止为了绕过错误自行写入 `.env`。
+视频生成支持两个系列：**即梦 Seedance**（`seedance2-0-pro-2`、`seedance2-5-pro-2`、`seedance-mini-2`）与 **MiniMax H3**（`minimax-h3-*`）。先用 `list-models` 获取当前 CLI 的参数范围；用户已指定模型或授权配参、直接提交时，按需求配齐参数并执行，不再等待选择。运行时只能调用已定义的 `scripts/minimax_video.py`，禁止创建或执行临时的 `run_video.py`、`video_prompt.txt` 等脚本/提示词文件，也禁止为了绕过错误自行写入 `.env`。
 
 遇到参数或素材问题，先检查路径、参数名、默认值及当前接口依据，修正授权范围内不改变目标的配置问题。仍有缺失素材、鉴权或本地校验冲突时，仅暂停受影响的提交并明确原因，继续其他独立可执行任务。不能为了凑出可执行方案，擅自换模型、改变时长、删参考图或把首尾帧控制降为普通参考图；也不能把 CLI 的限制直接归结为产品能力缺失。
 
@@ -217,17 +217,20 @@ cd <项目根目录>
 python scripts/minimax_video.py list-models
 ```
 
-**即梦 Seedance**（`--images` / `--videos` / `--audios` / `--resolution`；参考素材为本地文件时脚本会自动上传再引用，公网直链可直接传）：
+**即梦 Seedance**（`--images` / `--videos` / `--audios` / `--resolution`）：2.0 与 Mini 2 的素材仅接受公网 HTTPS 直链；2.5 可传本地文件（脚本自动上传）或公网直链。下例中的 `media.example.com` 为占位域名，调用时替换为实际素材 HTTPS 直链。
 
 ```bash
 # 文生视频（2.0：4-15 秒）
 python scripts/minimax_video.py run --model seedance2-0-pro-2 --prompt "提示词" --duration 5 --ratio 16:9 --resolution 720p
 
-# 图 / 视频 / 音频参考（仅 2.0 支持视频、音频参考；图片最多 9 张）
-python scripts/minimax_video.py run --model seedance2-0-pro-2 --prompt "提示词" --images photo.jpg --videos clip.mp4 --audios bgm.mp3 --duration 8 --ratio 9:16 --resolution 720p
+# 2.0：图片最多 9 张、视频最多 3 段、音频最多 3 个，均须公网 HTTPS URL
+python scripts/minimax_video.py run --model seedance2-0-pro-2 --prompt "提示词" --images https://media.example.com/photo.jpg --videos https://media.example.com/clip.mp4 --audios https://media.example.com/bgm.mp3 --duration 8 --ratio 9:16 --resolution 720p
 
-# 2.5：时长固定 15 / 30 秒，仅支持图片参考
-python scripts/minimax_video.py run --model seedance2-5-pro-2 --prompt "提示词" --images photo.jpg --duration 30 --ratio 16:9 --resolution 720p
+# 2.5：15 / 30 秒；图片最多 30 张（支持人像）、视频最多 10 段、音频最多 10 个
+python scripts/minimax_video.py run --model seedance2-5-pro-2 --prompt "提示词" --images photo.jpg --videos clip.mp4 --audios bgm.mp3 --duration 30 --ratio 16:9 --resolution 720p
+
+# Mini 2：4-15 秒，素材上限 9/3/3；视频或音频参考必须至少搭配一张图片
+python scripts/minimax_video.py run --model seedance-mini-2 --prompt "保持人像特征，参考动作节奏" --images https://media.example.com/photo.jpg --videos https://media.example.com/clip.mp4 --duration 5 --ratio 16:9 --resolution 480p
 ```
 
 **MiniMax H3**（`--reference-images` / `--reference-audios` / `--reference-videos` / `--first-image` / `--last-image`；参考素材可传公网直链、data URI 或本地文件）：
@@ -250,20 +253,20 @@ python scripts/minimax_video.py run --model minimax-h3-pro-768p --prompt "提示
 >
 > | 参数 | 即梦 Seedance | MiniMax H3 |
 > |------|--------------|------------|
-> | `--duration` | 2.0：4-15 秒；2.5：15 / 30 秒 | 4-15 秒 |
+> | `--duration` | 2.0 / Mini 2：4-15 秒（默认 5 秒）；2.5：15 / 30 秒（默认 15 秒） | 4-15 秒 |
 > | `--ratio` | 16:9 / 9:16 / 1:1 / 21:9 / 4:3 / 3:4（无 adaptive） | 16:9 / 9:16 / 1:1 / 21:9 / 4:3 / 3:4 / adaptive |
 > | `--resolution` | 480p / 720p（默认 480p） | 不支持（清晰度在模型名里，如 768p / 2K） |
-> | 参考素材 | `--images`(≤9) `--videos`(≤3) `--audios`(≤3)，视频/音频仅 2.0 | `--reference-images`(≤5) `--reference-audios`(≤3) `--reference-videos`(1) `--first-image` `--last-image` |
+> | 参考素材 | 2.0 / Mini 2：图片≤9、视频≤3、音频≤3；2.5：图片≤30（含人像）、视频≤10、音频≤10 | `--reference-images`(≤5) `--reference-audios`(≤3) `--reference-videos`(1) `--first-image` `--last-image` |
 > | 提交字段 | `aspect_ratio` / `resolution` / `images` / `videos` / `audios` | `ratio` / `referenceImages` / `referenceAudios` / `referenceVideos` / `first_image` / `last_image` |
 > | 轮询路径 | `/v1/videos/{model}/{task_id}` | `/v1/videos/minimax-h3/{task_id}` |
 >
-> 即梦的 `--videos` / `--audios` 只能配 2.0；2.5 只支持 `--images`。MiniMax 的 `first_image`/`last_image` 不能与 `referenceImages` 同用，参考音频必须配参考图（合计不超过 15 秒），参考视频仅 Pro 且只能 1 段 2-5 秒。两种模型都不能混用对方的参数名，脚本会直接报错。
+> 即梦三个模型都支持 `--images` / `--videos` / `--audios`；2.0 与 Mini 2 仅接受公网 HTTPS 素材 URL，Mini 2 使用视频或音频时必须至少提供一张图片。2.5 的 30/10/10 上限、2.0 的 HTTPS 约束及 Mini 2 的配置依据用户于 2026-11-02 提供的参数说明，未重新联网核实。MiniMax 的 `first_image`/`last_image` 不能与 `referenceImages` 同用，参考音频必须配参考图（合计不超过 15 秒），参考视频仅 Pro 且只能 1 段 2-5 秒。两种模型都不能混用对方的参数名，脚本会直接报错。
 >
 > 两类模型都提交到 `POST https://apis.aimaxhug.cloud/v1/videos`。提交成功后必须立即向用户报告任务 ID，并持续轮询返回状态/进度，直到完成或失败。**每 10 秒查询一次，总期限 30 分钟（1800 秒）**；2K 和参考视频请求在高峰期可能排队。
 >
 > 如果提交响应是 HTTP 400 但响应体包含 `task_id`，不得丢弃任务或停止；必须保留该 ID，继续调用轮询接口查询最终状态。只有 400 且没有 `task_id` 时，才在提交阶段停止。
 >
-> `prompt` 最多 7000 字符，超出部分按接口规则静默截断，不会生效。`duration` 未指定时按各模型默认值提交（即梦 2.0 与 MiniMax 为 5 秒，即梦 2.5 为 15 秒）。
+> `prompt` 最多 7000 字符，超出部分按接口规则静默截断，不会生效。`duration` 未指定时按各模型默认值提交（即梦 2.0、Mini 2 与 MiniMax 为 5 秒，即梦 2.5 为 15 秒）。
 >
 > 视频时长以 JSON 的 `duration` 字段为准。生成提示词中如果出现“5-second/5 秒”等时长描述，必须与 `duration` 保持一致，避免提示词语义与计费参数冲突。后台旧版日志可能显示 `aspect_ratio: None`，MiniMax 新接口实际使用的是 `ratio` 字段，不得因此改回 `aspect_ratio`；即梦接口则确实使用 `aspect_ratio`。
 
@@ -289,7 +292,8 @@ python scripts/minimax_video.py run --model minimax-h3-pro-768p --prompt "提示
 | 需求 | 推荐模型 |
 |------|---------|
 | 默认首选 | **即梦 Seedance 2.0 Pro**（`seedance2-0-pro-2`）— 4-15 秒，支持图片 / 视频 / 音频参考 |
-| 更长时长 | **即梦 Seedance 2.5 Pro**（`seedance2-5-pro-2`）— 15 / 30 秒，仅图片参考 |
+| 更长时长或更多素材 | **即梦 Seedance 2.5 Pro**（`seedance2-5-pro-2`）— 15 / 30 秒，图片≤30（含人像）/ 视频≤10 / 音频≤10 |
+| 指定 Mini 模型 | **即梦 Seedance Mini 2**（`seedance-mini-2`）— 4-15 秒、480p / 720p；视频或音频参考须配图 |
 | 当前 CLI 的首尾帧 / 参考视频驱动 | **MiniMax H3 Pro**（`minimax-h3-pro-768p` / `minimax-h3-pro-2k`）；不据此断言其他产品无首尾帧能力 |
 
 ---
@@ -344,6 +348,7 @@ python scripts/minimax_video.py run --model minimax-h3-pro-768p --prompt "提示
 | 文生视频（即梦 Seedance） | Available | `scripts/minimax_video.py run --model seedance2-0-pro-2 --prompt <提示词>` |
 | 参考素材生视频（即梦 Seedance） | Available | `scripts/minimax_video.py run --model seedance2-0-pro-2 --images <图片> --videos <视频> --audios <音频>` |
 | 长时长视频（即梦 Seedance 2.5） | Available | `scripts/minimax_video.py run --model seedance2-5-pro-2 --duration 30` |
+| 文生视频 / 多素材参考（即梦 Seedance Mini 2） | Available | `scripts/minimax_video.py run --model seedance-mini-2 --prompt <提示词>`（视频/音频参考须配图） |
 | 文生视频（MiniMax H3） | Available | `scripts/minimax_video.py run --model minimax-h3-768p --prompt <提示词>` |
 | 图生视频（MiniMax H3） | Available | `scripts/minimax_video.py run --model minimax-h3-2k --reference-images <图片>` |
 | 首尾帧视频（MiniMax H3） | Available | `scripts/minimax_video.py run --model minimax-h3-2k --first-image <首帧> --last-image <尾帧>` |

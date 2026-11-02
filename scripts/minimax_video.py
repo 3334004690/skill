@@ -3,10 +3,10 @@
 
 Two model families are exposed behind a single CLI:
 
-* **即梦 Seedance** — ``seedance2-0-pro-2`` / ``seedance2-5-pro-2``.
-  Text-to-video and reference-driven video. Reference images / videos / audios
-  are uploaded first and referenced by URL; the aspect ratio is sent as
-  ``aspect_ratio`` and the output size as ``resolution``.
+* **即梦 Seedance** — ``seedance2-0-pro-2`` / ``seedance2-5-pro-2`` /
+  ``seedance-mini-2``. Text-to-video and reference-driven video. 2.0 and Mini
+  accept public HTTPS reference URLs only; 2.5 also uploads local references.
+  The aspect ratio is sent as ``aspect_ratio`` and size as ``resolution``.
 
 * **MiniMax H3** — ``minimax-h3-*``.
   Text-to-video, image-to-video, first/last-frame and reference-video driven.
@@ -19,6 +19,7 @@ family-specific status endpoint until a playable URL is available.
 
 import argparse
 import base64
+import ipaddress
 import os
 import json as json_mod
 import mimetypes
@@ -61,6 +62,7 @@ VIDEO_MODELS = {
         "default_resolution": "480p",
         "assets": ("image", "video", "audio"),
         "limits": {"image": 9, "video": 3, "audio": 3},
+        "public_https_only": True,
     },
     "seedance2-5-pro-2": {
         "name": "即梦 Seedance 2.5 Pro",
@@ -69,8 +71,21 @@ VIDEO_MODELS = {
         "ratios": SEEDANCE_RATIOS,
         "resolutions": ("480p", "720p"),
         "default_resolution": "480p",
-        "assets": ("image",),
-        "limits": {"image": 9, "video": 0, "audio": 0},
+        "assets": ("image", "video", "audio"),
+        "limits": {"image": 30, "video": 10, "audio": 10},
+        "portrait_reference": True,
+    },
+    "seedance-mini-2": {
+        "name": "即梦 Seedance Mini 2",
+        "family": "seedance",
+        "duration": {"type": "range", "min": 4, "max": 15, "default": 5},
+        "ratios": SEEDANCE_RATIOS,
+        "resolutions": ("480p", "720p"),
+        "default_resolution": "480p",
+        "assets": ("image", "video", "audio"),
+        "limits": {"image": 9, "video": 3, "audio": 3},
+        "public_https_only": True,
+        "image_required_for_video_audio": True,
     },
     # ---------------- MiniMax H3 ----------------
     "minimax-h3-768p": {
@@ -223,8 +238,35 @@ def _validate_duration_constraints(args):
 
 
 # ---------------------------------------------------------------------------
-# 即梦 Seedance reference media (upload first, then reference by URL)
+# 即梦 Seedance reference media (2.0/Mini: HTTPS URLs; 2.5: upload or URL)
 # ---------------------------------------------------------------------------
+def _public_https_reference(value, label):
+    """Reject malformed URLs and obvious nonpublic hosts without network/DNS calls."""
+    message = f"{label}仅接受公网 HTTPS URL；本地素材请先上传并取得 HTTPS 直链"
+    try:
+        parts = urlparse(value)
+        host = (parts.hostname or "").lower().rstrip(".")
+        port = parts.port
+        if (parts.scheme.lower() != "https" or not host
+                or parts.username is not None or parts.password is not None
+                or any(char.isspace() for char in value) or "\\" in value
+                or (port is not None and port == 0)):
+            raise ValueError(message)
+        try:
+            address = ipaddress.ip_address(host)
+        except ValueError:
+            if ("." not in host
+                    or host.endswith((".localhost", ".local", ".internal", ".home", ".lan"))
+                    or all(char.isdigit() or char == "." for char in host)):
+                raise ValueError(message)
+        else:
+            if not address.is_global:
+                raise ValueError(message)
+    except ValueError as exc:
+        raise ValueError(message) from exc
+    return value
+
+
 def _upload_reference(client, value, label):
     """Return a public URL unchanged, or upload a local file and return its URL."""
     value = value.strip()
@@ -246,9 +288,11 @@ def _upload_reference(client, value, label):
     return url
 
 
-def _seedance_references(client, values, label):
+def _seedance_references(client, values, label, model):
     if not values:
         return []
+    if model.get("public_https_only"):
+        return [_public_https_reference(value, label) for value in values]
     return [_upload_reference(client, value, label) for value in values]
 
 
@@ -287,6 +331,16 @@ def _validate_seedance_args(args, model):
             raise ValueError(f"{model['name']} 不支持{labels[kind]}参考素材")
         if count > limits[kind]:
             raise ValueError(f"{labels[kind]}参考素材最多 {limits[kind]} 个")
+
+    if (model.get("image_required_for_video_audio")
+            and (counts["video"] or counts["audio"]) and not counts["image"]):
+        raise ValueError(f"{model['name']} 使用视频或音频参考时，必须至少提供一张 --images 图片")
+
+    if model.get("public_https_only"):
+        for values, label in ((args.images, "参考图"), (args.videos, "参考视频"),
+                              (args.audios, "参考音频")):
+            for value in values or []:
+                _public_https_reference(value, label)
 
     if args.reference_images or args.reference_audios or args.reference_videos \
             or args.first_image or args.last_image:
@@ -357,9 +411,9 @@ def _build_seedance_body(client, args, model, duration):
         "aspect_ratio": args.ratio or model["ratios"][0],
         "resolution": args.resolution or model["default_resolution"],
     }
-    images = _seedance_references(client, args.images, "参考图")
-    videos = _seedance_references(client, args.videos, "参考视频")
-    audios = _seedance_references(client, args.audios, "参考音频")
+    images = _seedance_references(client, args.images, "参考图", model)
+    videos = _seedance_references(client, args.videos, "参考视频", model)
+    audios = _seedance_references(client, args.audios, "参考音频", model)
     if images:
         body["images"] = images
     if videos:
@@ -617,14 +671,23 @@ def cmd_list_models(_args):
             if spec["type"] == "range"
             else " / ".join(str(option) for option in spec["options"]) + " 秒"
         )
+        labels = {"image": "图片", "video": "视频", "audio": "音频"}
         assets = " / ".join(
-            {"image": "图片", "video": "视频", "audio": "音频"}[kind] for kind in model["assets"]
+            f"{labels[kind]}(≤{model['limits'][kind]})" for kind in model["assets"]
         )
         print(f"    [{key}] {model['name']}")
         print(f"        时长: {duration}（默认 {spec['default']} 秒）")
         print(f"        画幅: {' / '.join(model['ratios'])}")
         print(f"        分辨率: {' / '.join(model['resolutions'])}（默认 {model['default_resolution']}）")
         print(f"        参考素材: {assets}")
+        if model.get("public_https_only"):
+            print("        素材输入: 仅公网 HTTPS URL，不接受本地文件或 HTTP URL")
+        else:
+            print("        素材输入: 本地文件（自动上传）或 http(s) 公网直链")
+        if model.get("portrait_reference"):
+            print("        支持人像参考")
+        if model.get("image_required_for_video_audio"):
+            print("        使用视频或音频参考时，至少提供一张图片")
 
     print("\n  MiniMax H3：")
     for key, model in VIDEO_MODELS.items():
@@ -644,17 +707,17 @@ def add_generate_args(parser):
                         help="视频模型 key（默认: seedance2-0-pro-2）")
     parser.add_argument("--prompt", required=True, help="视频提示词，最多 7000 字符")
     parser.add_argument("--duration", type=int, default=None,
-                        help="视频时长（秒）；即梦 2.0 与 MiniMax 为 4-15，即梦 2.5 为 15/30")
+                        help="视频时长（秒）；即梦 2.0 / Mini 与 MiniMax 为 4-15，2.5 为 15/30")
     parser.add_argument("--ratio", default=None,
                         help="画幅比例；即梦按 aspect_ratio 提交，MiniMax 按 ratio 提交")
     parser.add_argument("--resolution", default=None,
                         help="即梦专用分辨率：480p / 720p")
     parser.add_argument("--images", nargs="+", default=None,
-                        help="即梦参考图，URL 或本地文件，最多 9 张")
+                        help="即梦参考图：2.0/Mini 最多 9 个公网 HTTPS URL；2.5 最多 30 个路径/URL")
     parser.add_argument("--videos", nargs="+", default=None,
-                        help="即梦参考视频（仅 2.0），URL 或本地文件，最多 3 段")
+                        help="即梦参考视频：2.0/Mini 最多 3 个公网 HTTPS URL；2.5 最多 10 个路径/URL；Mini 须配图")
     parser.add_argument("--audios", nargs="+", default=None,
-                        help="即梦参考音频（仅 2.0），URL 或本地文件，最多 3 个")
+                        help="即梦参考音频：2.0/Mini 最多 3 个公网 HTTPS URL；2.5 最多 10 个路径/URL；Mini 须配图")
     parser.add_argument("--reference-images", nargs="+", default=None,
                         help="MiniMax 参考图 URL、data URI 或本地文件，最多 5 个")
     parser.add_argument("--reference-audios", nargs="+", default=None,

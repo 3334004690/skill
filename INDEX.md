@@ -33,7 +33,7 @@ INDEX.md                 ← 技能索引
 AUTH.md                  ← API 授权配置说明
 scripts/
   ai_image.py            ← 生图脚本
-  minimax_video.py       ← 视频生成脚本（即梦 Seedance 2.0/2.5 Pro + MiniMax H3）
+  minimax_video.py       ← 视频生成脚本（即梦 Seedance 2.0/2.5 Pro、Mini 2 + MiniMax H3）
   ai_audio.py            ← 文生音频和声音克隆脚本（MiniMax Speech 2.8）
   ai_search.py           ← 百度 AI 搜索脚本（支持 GET / POST）
   video_parse.py         ← 短视频解析脚本（提取视频直链）
