@@ -50,8 +50,10 @@ scripts/
   shared_client.py       ← 公共 API 客户端
   shared_download.py     ← 产物下载与本地保存
   shared_markers.py      ← 宿主资源标记
+  shared_menus.py        ← 各创作模块共用的中文菜单排版与比例名称
   requirements.txt      ← Python 依赖
 references/
+  interaction.md         ← 全模型中文菜单、自然语言交互和自动处理素材流程
   ai_image.md            ← 生图参考文档
   minimax_video.md       ← 视频生成参考文档（即梦 Seedance + MiniMax H3）
   omni_video.md          ← Omni 三个视频模型的参数、素材限制和调用示例

@@ -17,6 +17,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from shared_client import AimaxhugClient, AimaxhugError
 from shared_markers import mark_url
+from shared_menus import render_menu
 
 AUDIO_ENDPOINT = "https://apis.aimaxhug.cloud/v1/minimax/audio"
 AUDIO_LONG_ENDPOINT = "https://apis.aimaxhug.cloud/v1/minimax/audio/long"
@@ -95,13 +96,26 @@ def _extract_result(data):
     }
 
 
-def cmd_list_models(_args):
-    print("可用音频模型：")
-    for key, name in AUDIO_MODELS.items():
-        print(f"  [{key}] {name}")
-    print("\n本地文本限制：strip() 后最多 10000 字符；使用 --long、超过 5000 字符或声音克隆时调用 /audio/long。")
-    print("声音克隆：使用 --input-audio 传入一个本地音频文件，时长必须 >10 秒且 <120 秒。")
-    print("上传顺序：先调用 /api/v2/upload/file，再将 URL 作为单元素 file 数组提交 /audio/long。")
+def cmd_list_models(args):
+    selected = {args.model: AUDIO_MODELS[args.model]} if args.model else AUDIO_MODELS
+    if args.json:
+        print(json_mod.dumps({"models": selected, "default_model": "speech-2.8-turbo",
+                              "max_prompt_chars": MAX_PROMPT_CHARS, "auto_long_threshold": AUTO_LONG_THRESHOLD,
+                              "clone_sample_count": 1, "clone_min_seconds_exclusive": MIN_CLONE_SECONDS,
+                              "clone_max_seconds_exclusive": MAX_CLONE_SECONDS}, ensure_ascii=False, indent=2))
+        return
+    if not args.model:
+        print(render_menu("🎙️ 选一个配音模型",
+                          [("**1 · MiniMax Speech 2.8 Turbo（默认推荐）**", "速度优先"),
+                           ("2 · MiniMax Speech 2.8 HD", "音质优先")],
+                          "可以说模型名字或编号；也可以告诉我更看重速度还是音质。", ("配音模型", "适合什么需求")))
+        return
+    rows = [("📝 朗读内容", "把要朗读的完整文案发给我"),
+            ("🔊 声音感觉", "**由 AI 安排**，也可以描述温柔女声、沉稳男声、自然解说等"),
+            ("🎭 表达方式", "告诉我用于播客、广告、讲故事等，以及希望的情绪"),
+            ("🎤 参考声音", "可选：1 段超过 10 秒、不到 2 分钟的声音样本，用于克隆音色")]
+    title = f"🎙️ 配音创作 · {AUDIO_MODELS[args.model]}"
+    print(render_menu(title, rows, "发来要朗读的内容，告诉我想要什么声音；也可以让我帮你安排。"))
 
 
 def add_generate_args(parser):
@@ -190,7 +204,9 @@ def cmd_run(args):
 def main():
     parser = argparse.ArgumentParser(description="文字生音频 / 声音克隆（MiniMax Speech 2.8）")
     sub = parser.add_subparsers(dest="subcommand")
-    sub.add_parser("list-models", help="列出可用音频模型")
+    models = sub.add_parser("list-models", help="中文配音菜单；可按模型查看设置")
+    models.add_argument("--model", choices=list(AUDIO_MODELS), help="仅展示所选模型的创作设置")
+    models.add_argument("--json", action="store_true", help="供 AI 内部核对模型能力")
     run_parser = sub.add_parser("run", help="生成音频（默认）")
     add_generate_args(run_parser)
     args = parser.parse_args()

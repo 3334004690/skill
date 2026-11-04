@@ -37,6 +37,7 @@ from urllib.parse import quote, urlparse
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 from shared_client import AimaxhugClient, AimaxhugError
 from shared_markers import mark_url
+from shared_menus import render_menu
 
 
 VIDEO_ENDPOINT = "https://apis.aimaxhug.cloud/v1/videos"
@@ -276,7 +277,8 @@ def emit(result, as_json):
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Omni 专用视频生成 CLI")
     sub = parser.add_subparsers(dest="command")
-    models = sub.add_parser("list-models", help="离线查看三个模型及参数")
+    models = sub.add_parser("list-models", help="中文创作菜单；--json 供 AI 核对技术参数")
+    models.add_argument("--model", choices=MODELS, help="仅展示所选模型的创作设置")
     models.add_argument("--json", action="store_true")
     run = sub.add_parser("run", help="生成视频；--dry-run 仅离线预检")
     run.add_argument("--model", choices=MODELS, required=True)
@@ -301,8 +303,26 @@ def main(argv=None):
                   "duration_note": DURATION_NOTE, "max_images": 5, "max_videos_total": 2,
                   "max_media_bytes": MAX_MEDIA_BYTES, "max_video_resolution": "1920x1080",
                   "reference_fields": list(REFERENCE_FIELDS), "prompt_max_length": None}
-        print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else
-              "\n".join(MODELS) + "\n" + DURATION_NOTE + "\n完整参数: python scripts/omni_video.py run --help")
+        if args.json:
+            if args.model:
+                result["models"] = [args.model]
+            print(json.dumps(result, ensure_ascii=False, indent=2))
+            return 0
+        names = {"omni-fast": "Omni Fast · 标准版", "omni-fast-no-water": "Omni Fast · 无水印版",
+                 "omni-fast-v2v-no-water": "Omni Fast · 视频参考无水印版"}
+        if not args.model:
+            print(render_menu("🎬 选一个 Omni 模型", [(f"{index} · {names[model]}", "可用图片或视频参考，目前成片约 10 秒")
+                              for index, model in enumerate(MODELS, 1)],
+                              "可以说版本名字或编号；有参考素材直接发给我。", ("创作模型", "可以怎么创作")))
+            return 0
+        rows = [("✍️ 画面内容", "描述想看到的场景、动作和镜头效果"),
+                ("⏱️ 视频时长", "**目前成片约 10 秒**，填写其他秒数不保证改变成片时长"),
+                ("🖼️ 画面比例", "**默认横屏 16:9**；也可选竖屏 9:16"),
+                ("📎 参考图片", "可选：单张参考图、开头和结尾画面，或多张参考图（最多 5 张）"),
+                ("🎞️ 参考视频", "可选：合计最多 2 段；每段不超过 8MB、画面不超过 1920×1080"),
+                ("💡 图片大小", "每张参考图片不超过 8MB，素材处理由 AI 完成")]
+        print(render_menu("🎬 视频创作 · " + (names[args.model] if args.model else "Omni"), rows,
+                          "告诉我想拍什么、横屏还是竖屏；有参考素材直接发给我。"))
         return 0
     if not args.command:
         parser.print_help()

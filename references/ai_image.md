@@ -2,6 +2,12 @@
 
 Generate images from text prompts or edit existing images with reference images.
 
+## 面向用户的创作菜单
+
+遵循 [统一中文菜单与交互](interaction.md)。`list-models` 用产品名称和用途展示模型；选好后用 `list-models --model <模型>` 以“想设置什么 / 可以怎么选”展示画面内容、比例、清晰度、张数、风格和参考图片。用户可回复编号、名称或偏好。动态尺寸模型用“自动安排尺寸”，不让普通用户计算像素约束；内部能力用 `list-models --json` 核对。
+
+只补问缺少的创作要求，不要求逐项填写参数。已有本地参考图直接交给生成脚本自动上传，无需重复上传，不把返回地址或元数据展示为用户选项。以下技术参数和命令供 AI 内部调用，用户明确索要时再展示。
+
 ## Supported Task Types
 
 | Type | Description |
@@ -27,8 +33,12 @@ python {baseDir}/scripts/ai_image.py <subcommand> [options]
 ### List Models
 
 ```bash
-# Show all models with supported parameters (MUST do this first)
+# Show a Chinese creative menu when choices are needed
 python {baseDir}/scripts/ai_image.py list-models
+
+# Selected-model menu; machine-readable capabilities for internal checks
+python {baseDir}/scripts/ai_image.py list-models --model nano-banana
+python {baseDir}/scripts/ai_image.py list-models --json
 ```
 
 ### Text-to-Image

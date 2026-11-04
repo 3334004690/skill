@@ -6,6 +6,9 @@
 - Do NOT ask the user to upload manually — handle it for them.
 - The returned data object (tmp_url/name/type/size) is passed to
   ai_image.py's --input-images for image-to-image generation.
+- For Muse images/first-last frames/videos, use only tmp_url in the matching
+  reference field. Check a local continuation video's duration before uploading.
+- Keep intermediate upload URLs and metadata out of ordinary creative menus.
 
 Subcommands:
     run           Upload file(s) and print result — DEFAULT

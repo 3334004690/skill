@@ -3,9 +3,10 @@
 
 ## AGENT INSTRUCTIONS — READ FIRST
 - Default flow: ALWAYS use `run` (generate + show result).
-- Before generating, show `list-models` so user can choose model/params.
-- Do NOT pick a model for the user — show the table and let them choose.
-- gpt-image-2 does NOT support --resolution (auto-mapped from proportion).
+- Use the Chinese creative menu when the user needs options. Reuse an existing
+  model choice or authorization to choose; do not ask them to fill every field.
+- Technical capabilities are available through list-models --json. Dynamic-size
+  models accept auto or a valid pixel size through --resolution.
 - Multi-image (--count > 1): tasks run in parallel automatically.
   If user specifies --styles, use those; otherwise auto-generate different styles.
   Do NOT run multi-image tasks sequentially — use --count and let the script parallelize.
@@ -48,6 +49,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 from shared_client import AimaxhugClient, AimaxhugError, require_requests
 from shared_markers import mark_url
+from shared_menus import ratio_choices, render_menu
 
 GENERATE_ENDPOINT = "/api/v1/imageToImage"
 UPLOAD_ENDPOINT = "/api/v2/upload/file"
@@ -299,46 +301,34 @@ def generate_one(client, model, body, index, total):
 # ---------------------------------------------------------------------------
 
 def cmd_list_models(args):
-    """Print model table with all parameters — per-model proportions."""
-    print()
-    print("=" * 100)
-    print("📷 可用生图模型 — 请选择并告诉我以下参数")
-    print("=" * 100)
-
-    header = f"{'模型名称':<18} {'模型Key':<20} {'分辨率':<28} {'支持比例'}"
-    sep = "─" * 100
-    print(f"\n{header}")
-    print(sep)
-
-    for key, m in MODELS.items():
-        if m["resolution_mode"] == "manual":
-            res = f"✅ 手动: {' / '.join(m['resolutions'])}"
-        elif m["resolution_mode"] == "auto":
-            res = "⚠️ 自动"
-        else:
-            res = "✅ 动态: auto 或 WIDTHxHEIGHT"
-
-        props = " / ".join(m["proportions"])
-        print(f"{m['name']:<18} {key:<20} {res:<28} {props}")
-
-    print(sep)
-    print()
-
-    for key, m in MODELS.items():
-        print(f"  [{key}] {m['name']} — {m['desc']}")
-        print(f"      支持比例 ({len(m['proportions'])}种): {' / '.join(m['proportions'])}")
-        if m["resolution_mode"] == "manual":
-            print(f"      分辨率: {' / '.join(m['resolutions'])}（手动选择，默认 {m['default_resolution']}）")
-        elif m["resolution_mode"] == "auto":
-            print(f"      分辨率: 不支持手动选择，由比例自动决定")
-        else:
-            print(f"      分辨率: auto 或 WIDTHxHEIGHT（宽高均 ≤3840，须为16的倍数）")
-            print(f"      约束: 总像素 655,360–8,294,400，长宽比不超过 3:1")
-        print()
-
-    print("请选择模型并告诉我：提示词、比例、分辨率（如适用）")
-    print("=" * 100)
-    print()
+    """Show creative choices; keep API capabilities in machine-readable output."""
+    selected = {args.model: MODELS[args.model]} if args.model else MODELS
+    if args.json:
+        print(json_mod.dumps({"models": selected, "default_model": "nano-banana", "max_count": 14},
+                             ensure_ascii=False, indent=2))
+        return
+    names = {"gpt-image-2": "GPT Image 2", "gpt-image-2.5-sunburst": "GPT Image 2.5 Sunburst",
+             "gpt-image-2.5-flare": "GPT Image 2.5 Flare"}
+    if not args.model:
+        choices = [((f"**{index} · {names.get(key, model['name'])}（默认推荐）**" if key == "nano-banana"
+                     else f"{index} · {names.get(key, model['name'])}"),
+                    model["desc"].replace("gpt-image-2", "GPT Image 2").replace("Nano Banana 上位替代", "注重画面细节"))
+                   for index, (key, model) in enumerate(selected.items(), 1)]
+        print(render_menu("🎨 选一个图片创作模型", choices,
+                          "可以说模型名字或编号；也可以直接说用途，并让我帮你选。", ("创作模型", "适合什么需求")))
+        return
+    model = MODELS[args.model]
+    if model["resolution_mode"] == "manual":
+        quality = f"**默认 {model['default_resolution'].upper()}**；可选 " + " / ".join(value.upper() for value in model["resolutions"])
+    else:
+        quality = "**自动安排尺寸**；也可以告诉我成品用途或需要的尺寸"
+    rows = [("✍️ 画面内容", "描述想画什么，或想把现有图片改成什么样"),
+            ("🖼️ 画面比例", ratio_choices(model["proportions"])),
+            ("✨ 清晰度", quality), ("🔢 图片数量", "**默认 1 张**；一次可做 1–14 张"),
+            ("🎨 画面风格", "写实、卡通、油画等；多张图片可用不同风格"),
+            ("📎 参考图片", "可选：发来想参考或修改的图片，说明哪些内容要保留")]
+    title = f"🎨 图片创作 · {names.get(args.model, model['name'])}"
+    print(render_menu(title, rows, "告诉我想画什么、做几张；其他设置可以交给我。"))
 
 
 # ---------------------------------------------------------------------------
@@ -572,7 +562,9 @@ def main():
     sub = parser.add_subparsers(dest="subcommand")
 
     # list-models
-    sub.add_parser("list-models", help="列出所有可用模型及参数")
+    models = sub.add_parser("list-models", help="中文创作菜单；可按模型查看设置")
+    models.add_argument("--model", choices=list(MODELS), help="仅展示所选模型的创作设置")
+    models.add_argument("--json", action="store_true", help="供 AI 内部核对模型能力")
 
     # run
     p_run = sub.add_parser("run", help="生成图片（默认）")

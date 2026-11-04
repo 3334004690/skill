@@ -265,10 +265,28 @@ def emit(result, as_json):
                   f"建议源视频 ≤{reference['recommended_max_source_seconds']} 秒")
 
 
+def user_menu():
+    """A user-facing menu; API details remain in --json and run --help."""
+    seconds = "、".join(map(str, SECONDS))
+    return (
+        "**🎬 Muse 视频创作**\n\n"
+        "| 想设置什么 | 可以怎么选 |\n"
+        "| :--- | :--- |\n"
+        "| ✍️ 画面内容 | 描述场景、人物动作和台词，**这是必填项** |\n"
+        f"| ⏱️ 视频时长 | **默认 5 秒**；可选 {seconds} 秒，推荐 5–40 秒 |\n"
+        "| 🖼️ 画面比例 | **横屏 16:9**、竖屏 9:16、方形 1:1、横幅 4:3、竖幅 3:4 |\n"
+        "| 🔊 人物声音 | **正常说话**，或只做口型、不出声；环境音和背景音乐保留 |\n"
+        "| 🎥 镜头方式 | **由 AI 安排**，也可以选推进、环绕、跟拍、固定、向左移动 |\n"
+        "| 📎 参考素材 | 可选：参考图片（最多 4 张）、开头画面、结尾画面，或用于续写的视频 |\n"
+        "| 🚫 避免内容 | 可选：例如不要字幕、不要模糊、不要多余人物 |\n\n"
+        "告诉我想拍什么、做多少秒；有参考图片或视频，直接发给我。其他设置可以交给我。"
+    )
+
+
 def main(argv=None):
     parser = argparse.ArgumentParser(description="Muse Video Pro 视频生成 CLI")
     sub = parser.add_subparsers(dest="command")
-    models = sub.add_parser("list-models", help="离线查看模型及参数")
+    models = sub.add_parser("list-models", help="展示中文创作菜单；--json 供 AI 核对技术参数")
     models.add_argument("--json", action="store_true")
     run = sub.add_parser("run", help="生成视频；有 video_url 时先检测源视频时长")
     run.add_argument("--model", choices=(MODEL,), default=MODEL)
@@ -301,14 +319,7 @@ def main(argv=None):
                   "reference_source_must_be_shorter_than_output": True,
                   "reference_seconds_meaning": "target_total_duration_after_continuation",
                   "recommended_source_headroom_seconds": 2}
-        print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else
-              MODEL + "\n比例: " + " / ".join(RATIOS)
-              + "\n秒数: " + " / ".join(map(str, SECONDS)) + "（默认 5，推荐 5–40 秒）"
-              + "\n运镜示例: " + " / ".join(CAMERA_MOTIONS)
-              + "\n支持负面提示词、首尾帧 URL、最多 4 张 URL/Base64 参考图、参考视频 URL。"
-              + "\n参考视频时生成时长至少 20 秒；提交前实测源视频，等长或更长则拦截，建议源视频 ≤生成时长−2 秒。"
-              + "\nmute_voice 默认 false；true 保留人物口型并静音人物配音，保留 SFX/Foley/BGM。"
-              + "\n完整参数: python scripts/muse_video.py run --help")
+        print(json.dumps(result, ensure_ascii=False, indent=2) if args.json else user_menu())
         return 0
     if not args.command:
         parser.print_help()

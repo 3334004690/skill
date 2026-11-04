@@ -2,6 +2,14 @@
 
 本页说明 **即梦 Seedance** 与 **MiniMax H3** 的参数，使用 `scripts/minimax_video.py`。**Omni** 三个模型使用独立脚本 `scripts/omni_video.py`，其参数、约 10 秒输出特性和调用示例见 [omni_video.md](omni_video.md)；请求路径和任务查询方式沿用视频接口。
 
+## 面向用户的创作菜单
+
+遵循 [统一中文菜单与交互](interaction.md)。`list-models` 展示中文名称、时长和参考创作方式；选好后用 `list-models --model <模型>` 展示该模型的画面内容、多少秒、画面比例、清晰度和可用参考素材。内部能力用 `list-models --json` 获取，不把下面的技术表复制给普通用户。
+
+用户发来的本地素材由 AI 按模型处理：即梦 2.0 / Mini 2 调用已有上传脚本后填入返回地址；2.5 可由生成脚本自动上传；MiniMax 直接使用脚本已有的本地素材处理。已有可用链接直接传入，不重复上传。保留各模型数量、时长和素材搭配规则，用“视频参考还需要搭配一张图片”等中文说明限制，不要求用户准备某种协议地址或转换编码。
+
+人物静音口型控制属于 Muse 的已接入能力，不添加到即梦或 MiniMax 菜单；用户描述镜头效果时写入提示词，不编造独立镜头参数。MiniMax 普通版不展示参考视频选项；Pro 版说明支持 1 段 2–5 秒参考视频，不套用 Muse 的续写总时长规则。
+
 ## 能力依据与模型标识
 
 下列模型表、字段映射和校验表描述的是 [当前 CLI](../scripts/minimax_video.py) 已实现的范围，不是即梦或 MiniMax 全部产品能力。先用 `list-models` 查看本地注册表，遇到首尾帧、时长或素材组合争议时，再核对用户指定的**完整模型 key**与官方来源，不能只按“2.5”等简称判断。
@@ -70,7 +78,7 @@ MiniMax 时长 4–15 秒；画幅 `16:9` / `9:16` / `1:1` / `21:9` / `4:3` / `3
 
 The predefined script performs validation and polling. It never creates `.env`, prompt files, helper scripts, or alternate video-generation scripts at runtime. A local validation failure prevents that request from being submitted. Fix configuration issues within the user's existing authorization, and continue independent work if one request remains blocked. An error after a task ID has been returned must be handled by preserving the ID and checking task status rather than resubmitting blindly.
 
-用户已指定模型或明确授权代选、自动配参、直接提交时，展示所选参数（含单位及来源）后执行，无需再等待模型选择或首次生成确认。只有会改变目标且无法推断的关键输入缺失时才询问。缺 Key 时明确报告，完成本地参数检查；沙箱模式不等于有 Key，也不意味着可跳过素材和校验。
+用户已指定模型或明确授权代选、自动配参、直接提交时，用中文简短说明本次时长、比例和使用的素材后执行，无需再等待模型选择或首次生成确认。只有会改变目标且无法推断的关键输入缺失时才询问。参数来源和内部字段由 AI 核对，技术问题按需解释。缺 Key 时明确报告，完成本地参数检查；沙箱模式不等于有 Key，也不意味着可跳过素材和校验。
 
 If submission returns HTTP 400 but includes a `task_id`, the script preserves the task ID and continues polling. A 400 without a task ID is treated as a submission failure.
 

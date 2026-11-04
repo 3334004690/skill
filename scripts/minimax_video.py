@@ -35,6 +35,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from shared_client import AimaxhugClient, AimaxhugError, require_requests
 from shared_markers import mark_url
 from ai_audio import audio_duration
+from shared_menus import ratio_choices, render_menu
 
 VIDEO_ENDPOINT = "https://apis.aimaxhug.cloud/v1/videos"
 UPLOAD_ENDPOINT = "/api/v2/upload/file"
@@ -659,47 +660,44 @@ def _mode_for(model, args):
 # ---------------------------------------------------------------------------
 # Commands
 # ---------------------------------------------------------------------------
-def cmd_list_models(_args):
-    print("当前 CLI 已接入的视频模型与本地参数范围（非平台实时能力）：")
-    print("\n  即梦 Seedance：")
-    for key, model in VIDEO_MODELS.items():
-        if model["family"] != "seedance":
-            continue
-        spec = model["duration"]
-        duration = (
-            f"{spec['min']}-{spec['max']} 秒"
-            if spec["type"] == "range"
-            else " / ".join(str(option) for option in spec["options"]) + " 秒"
-        )
-        labels = {"image": "图片", "video": "视频", "audio": "音频"}
-        assets = " / ".join(
-            f"{labels[kind]}(≤{model['limits'][kind]})" for kind in model["assets"]
-        )
-        print(f"    [{key}] {model['name']}")
-        print(f"        时长: {duration}（默认 {spec['default']} 秒）")
-        print(f"        画幅: {' / '.join(model['ratios'])}")
-        print(f"        分辨率: {' / '.join(model['resolutions'])}（默认 {model['default_resolution']}）")
-        print(f"        参考素材: {assets}")
-        if model.get("public_https_only"):
-            print("        素材输入: 仅公网 HTTPS URL，不接受本地文件或 HTTP URL")
-        else:
-            print("        素材输入: 本地文件（自动上传）或 http(s) 公网直链")
-        if model.get("portrait_reference"):
-            print("        支持人像参考")
+def cmd_list_models(args):
+    selected = {args.model: VIDEO_MODELS[args.model]} if args.model else VIDEO_MODELS
+    if args.json:
+        print(json_mod.dumps({"models": selected, "default_model": "seedance2-0-pro-2"}, ensure_ascii=False, indent=2))
+        return
+    if not args.model:
+        choices = []
+        for index, (key, model) in enumerate(selected.items(), 1):
+            spec = model["duration"]
+            timing = f"{spec['min']}–{spec['max']} 秒" if spec["type"] == "range" else " / ".join(map(str, spec["options"])) + " 秒"
+            purpose = "图片、视频和声音参考" if model["family"] == "seedance" else "图片参考或开头、结尾画面"
+            if model.get("tier") == "pro":
+                purpose += "，也支持短视频参考"
+            choices.append(((f"**{index} · {model['name']}（默认推荐）**" if key == "seedance2-0-pro-2"
+                             else f"{index} · {model['name']}"),
+                            f"{timing}；{purpose}"))
+        print(render_menu("🎬 选一个视频创作模型", choices,
+                          "可以说模型名字或编号；告诉我想拍什么，也可以让我按需求推荐。", ("创作模型", "可以怎么创作")))
+        return
+    model = VIDEO_MODELS[args.model]
+    spec = model["duration"]
+    timing = f"{spec['min']}–{spec['max']} 秒" if spec["type"] == "range" else " / ".join(map(str, spec["options"])) + " 秒"
+    rows = [("✍️ 画面内容", "描述场景、人物动作和镜头效果"),
+            ("⏱️ 视频时长", f"**默认 {spec['default']} 秒**；可选 {timing}"),
+            ("🖼️ 画面比例", ratio_choices(model["ratios"]))]
+    if model["family"] == "seedance":
+        rows.extend([("✨ 清晰度", f"**默认 {model['default_resolution']}**；可选 " + " / ".join(model["resolutions"])),
+                     ("📎 参考素材", f"图片最多 {model['limits']['image']} 张、视频最多 {model['limits']['video']} 段、声音最多 {model['limits']['audio']} 个")])
         if model.get("image_required_for_video_audio"):
-            print("        使用视频或音频参考时，至少提供一张图片")
-
-    print("\n  MiniMax H3：")
-    for key, model in VIDEO_MODELS.items():
-        if model["family"] != "minimax":
-            continue
-        pro_note = "（Pro，支持参考视频）" if model["tier"] == "pro" else ""
-        print(f"    [{key}] {model['name']} {pro_note}")
-    print("        时长: 4-15 秒；画幅: " + " / ".join(MINIMAX_RATIOS))
-    print("        参考图最多 5 张，参考音频最多 3 个（须配图），参考视频仅 Pro 且只能 1 段。")
-
-    print("\n即梦模型使用 --images / --videos / --audios / --resolution；"
-          "MiniMax 模型使用 --reference-images / --reference-audios / --reference-videos。")
+            rows.append(("💡 素材搭配", "使用视频或声音参考时，请同时提供至少一张参考图片"))
+    else:
+        rows.extend([("✨ 清晰度", "**2K**" if args.model.endswith("2k") else "**768p**"),
+                     ("📎 参考图片", "最多 5 张；或单独使用开头、结尾画面，两种方式分开使用"),
+                     ("🔊 参考声音", "可选，最多 3 个、合计不超过 15 秒，需搭配参考图片")])
+        if model.get("tier") == "pro":
+            rows.append(("🎞️ 参考视频", "可选，1 段 2–5 秒的视频"))
+    print(render_menu(f"🎬 视频创作 · {model['name']}", rows,
+                      "告诉我想拍什么、做多少秒；有参考素材直接发给我。"))
 
 
 def add_generate_args(parser):
@@ -807,7 +805,9 @@ def cmd_run(args):
 def main():
     parser = argparse.ArgumentParser(description="即梦 Seedance / MiniMax H3 视频生成")
     sub = parser.add_subparsers(dest="subcommand")
-    sub.add_parser("list-models", help="列出视频模型和参数")
+    models = sub.add_parser("list-models", help="中文创作菜单；可按模型查看设置")
+    models.add_argument("--model", choices=list(VIDEO_MODELS), help="仅展示所选模型的创作设置")
+    models.add_argument("--json", action="store_true", help="供 AI 内部核对模型能力")
     run_parser = sub.add_parser("run", help="生成视频（默认）")
     add_generate_args(run_parser)
     args = parser.parse_args()
