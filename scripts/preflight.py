@@ -21,7 +21,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 from shared_config import find_api_key
 
 REQUIREMENTS_PATH = Path(__file__).resolve().with_name("requirements.txt")
-MODULE_NAMES = {"python-dotenv": "dotenv"}
+MODULE_NAMES = {"python-dotenv": "dotenv", "Pillow": "PIL"}
 
 
 def check_dependencies():

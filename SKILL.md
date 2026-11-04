@@ -19,6 +19,8 @@ metadata:
       - requests>=2.28.0
       - python-dotenv>=1.0.0
       - mutagen>=1.47.0
+      - Pillow>=10.4.0
+      - imageio-ffmpeg>=0.5.1
   primaryEnv: AIMAXHUG_API_KEY
   envVars:
     - name: AIMAXHUG_API_KEY
@@ -91,6 +93,7 @@ python scripts/preflight.py --install-deps
 9. **不要问"要不要"** — 明显需要的就去做，比如用户说"生图"直接走流程。
 10. **结论和证据清楚** — 先说已完成或当前具体阻塞，需要配置表时用用户听得懂的中文呈现时长、比例和声音等实际选择。区分“已配好设置”“正在生成（任务 ID）”“已完成（产物）”，不把候选方案当作可执行交付。用户主动索要技术配置时再展示参数名、命令和来源。
 11. **素材交给 AI 处理** — 用户提供本地图片或视频时，由 AI 调用已有上传脚本并把返回地址填入对应生成参数；已有可用素材链接直接使用，不重复上传。技术菜单、上传返回对象、中间素材地址及 HTTP(S)/URL/Base64、布尔值等实现细节不出现在普通创作菜单、素材要求或确认话术中；对用户说“参考图片”“续写视频”“人物是否出声”。最终作品正常展示，用户明确索要链接或技术说明时按需提供。
+12. **参考素材上传前自动压缩** — 公共上传入口会先压缩图片或视频的临时副本，再上传实际压缩文件。图片固定用质量 40，视频固定用 CRF 40；**不设 1MB/2MB 体积门槛，不为体积继续降质、缩小画面、降低帧率或截短视频**。图片保留原尺寸，视频保留分辨率、帧率、时长与声音，原文件保留。压缩失败不上传原文件兜底。生成成品的转存保留成品质量；音频和其他文件按原方式上传。已有素材链接直接使用，不为压缩重新下载上传。该过程内部自动完成，不新增用户菜单选项；细节见 [上传压缩](references/upload.md#上传前压缩)。
 
 ---
 
@@ -384,7 +387,7 @@ python scripts/muse_video.py run --prompt "参考源视频动作生成连贯画�
 | 视频参考（Omni V2V） | Available | `scripts/omni_video.py run --model omni-fast-v2v-no-water --prompt <提示词> --video-url <视频URL>` |
 | 文生视频 / 首尾帧 / 多参考图（Muse） | Available | `scripts/muse_video.py run --prompt <提示词>`（默认 `muse-video-pro`，可选 `--mute-voice true`） |
 | 视频参考（Muse） | Available | `scripts/muse_video.py run --prompt <提示词> --video-url <视频URL> --seconds 20`（自动检测时长） |
-| 视频时长检测 | Available | `scripts/video_duration.py <文件或URL> --seconds 20 --json`（需 ffprobe，无需 Key） |
+| 视频时长检测 | Available | `scripts/video_duration.py <文件或URL> --seconds 20 --json`（ffprobe 或已声明视频组件，无需 Key） |
 | 列出视频模型 | Available | `scripts/minimax_video.py list-models` |
 | 文生音频 | Available | `scripts/ai_audio.py run`（短文本 `/v1/minimax/audio`） |
 | 长文本音频 | Available | `scripts/ai_audio.py run --long`（`/v1/minimax/audio/long`） |

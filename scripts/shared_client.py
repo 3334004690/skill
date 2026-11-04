@@ -114,25 +114,26 @@ class AimaxhugClient:
 
         return resp.status_code, data
 
-    def post_file(self, path: str, file_path: str, mime_type: str, **kwargs) -> dict:
-        """POST a multipart file upload and return parsed JSON."""
+    def post_file(self, path: str, file_path: str, mime_type: str, compress_media: bool = True, **kwargs) -> dict:
+        """Compress reference media before multipart upload; return server data."""
         requests = self._requests
         url = f"{BASE_URL}{path}" if path.startswith("/") else path
-        from pathlib import Path
-        name = Path(file_path).name
-        with open(file_path, "rb") as f:
-            try:
+        from shared_media import prepare_upload
+        try:
+            with prepare_upload(file_path, mime_type, compress=compress_media) as media, media.path.open("rb") as f:
                 resp = requests.post(
                     url,
                     headers=self.headers,
-                    files={"file": (name, f, mime_type)},
+                    files={"file": (media.name, f, media.mime_type)},
                     timeout=kwargs.pop("timeout", 120),
                     **kwargs,
                 )
-            except requests.exceptions.Timeout:
-                raise AimaxhugError("上传超时（>120秒）", 0)
-            except requests.exceptions.ConnectionError:
-                raise AimaxhugError("网络连接失败，请检查网络", 0)
+        except requests.exceptions.Timeout:
+            raise AimaxhugError("上传超时（>120秒）", 0)
+        except requests.exceptions.ConnectionError:
+            raise AimaxhugError("网络连接失败，请检查网络", 0)
+        except (ValueError, OSError) as exc:
+            raise AimaxhugError(f"素材处理失败: {exc}", 0) from exc
 
         try:
             data = resp.json()

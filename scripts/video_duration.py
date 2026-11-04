@@ -62,7 +62,10 @@ def probe_video_duration(source, ffprobe="ffprobe", timeout=60):
             timeout=timeout, check=True,
         )
     except FileNotFoundError as exc:
-        raise ValueError("未找到 ffprobe；请安装 FFmpeg 并将 ffprobe 加入 PATH，或用 --ffprobe 指定路径") from exc
+        if ffprobe != "ffprobe":
+            raise ValueError("指定的 ffprobe 不存在，请检查 --ffprobe 路径") from exc
+        from shared_media import ffmpeg_video_metadata
+        return ffmpeg_video_metadata(source, timeout=timeout)["duration"]
     except subprocess.TimeoutExpired as exc:
         raise ValueError("视频时长检测超时，请检查视频直链或本地文件") from exc
     except (OSError, subprocess.CalledProcessError) as exc:

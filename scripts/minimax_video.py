@@ -23,7 +23,6 @@ import ipaddress
 import os
 import json as json_mod
 import mimetypes
-import subprocess
 import sys
 import tempfile
 import time
@@ -36,6 +35,8 @@ from shared_client import AimaxhugClient, AimaxhugError, require_requests
 from shared_markers import mark_url
 from ai_audio import audio_duration
 from shared_menus import ratio_choices, render_menu
+from shared_media import prepare_upload
+from video_duration import probe_video_duration
 
 VIDEO_ENDPOINT = "https://apis.aimaxhug.cloud/v1/videos"
 UPLOAD_ENDPOINT = "/api/v2/upload/file"
@@ -137,8 +138,9 @@ def _media_value(value):
         raise ValueError(f"参考素材不存在: {value}")
     mime_type, _ = mimetypes.guess_type(path.name)
     mime_type = mime_type or "application/octet-stream"
-    encoded = base64.b64encode(path.read_bytes()).decode("ascii")
-    return f"data:{mime_type};base64,{encoded}"
+    with prepare_upload(path, mime_type) as media:
+        encoded = base64.b64encode(media.path.read_bytes()).decode("ascii")
+        return f"data:{media.mime_type};base64,{encoded}"
 
 
 def _media_values(values, label):
@@ -201,14 +203,9 @@ def _local_media_duration(path, label):
     """Probe audio/video duration without creating user-visible files."""
     if path.suffix.lower() in {".mp4", ".mov", ".m4v", ".webm", ".mkv", ".avi"}:
         try:
-            completed = subprocess.run(
-                ["ffprobe", "-v", "error", "-show_entries", "format=duration",
-                 "-of", "default=noprint_wrappers=1:nokey=1", str(path)],
-                capture_output=True, text=True, timeout=30, check=True,
-            )
-            return float(completed.stdout.strip())
-        except (FileNotFoundError, subprocess.SubprocessError, ValueError) as exc:
-            raise ValueError(f"无法读取{label}时长，请安装 ffprobe 后重试") from exc
+            return probe_video_duration(path, timeout=30)
+        except ValueError as exc:
+            raise ValueError(f"无法读取{label}时长: {exc}") from exc
     return audio_duration(path)
 
 

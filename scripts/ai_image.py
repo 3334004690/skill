@@ -247,7 +247,8 @@ def _ensure_direct_url(client, image_url):
             tmp.write(resp.content)
             tmp_path = tmp.name
         try:
-            data = client.post_file(UPLOAD_ENDPOINT, tmp_path, ct)
+            # This is a generated final image, not a reference for AI analysis.
+            data = client.post_file(UPLOAD_ENDPOINT, tmp_path, ct, compress_media=False)
             return data.get("tmp_url", image_url)
         finally:
             if os.path.exists(tmp_path):

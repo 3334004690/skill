@@ -51,6 +51,8 @@ scripts/
   shared_download.py     ← 产物下载与本地保存
   shared_markers.py      ← 宿主资源标记
   shared_menus.py        ← 各创作模块共用的中文菜单排版与比例名称
+  shared_media.py        ← 参考图片/视频上传前按质量40编码及临时文件清理
+  test_media_upload.py   ← 真实媒体压缩与模拟上传回归测试
   requirements.txt      ← Python 依赖
 references/
   interaction.md         ← 全模型中文菜单、自然语言交互和自动处理素材流程

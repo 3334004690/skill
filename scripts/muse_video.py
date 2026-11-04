@@ -226,7 +226,9 @@ def generate(client, body, timeout):
     for field in REFERENCE_FIELDS:
         value = body.get(field)
         inputs.update(value if isinstance(value, list) else ([value] if value else []))
-    code, response = client.post_with_status(VIDEO_ENDPOINT, json=body, timeout=120)
+    # The live Muse upstream requires seconds as a string on the wire.
+    request_body = dict(body, seconds=str(body["seconds"]))
+    code, response = client.post_with_status(VIDEO_ENDPOINT, json=request_body, timeout=120)
     if not isinstance(response, dict):
         raise AimaxhugError("提交响应格式无效；请核查服务端任务后再决定是否重试")
     task_id = task_id_of(response)

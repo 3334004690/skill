@@ -172,7 +172,8 @@ class MuseTests(unittest.TestCase):
         self.assertEqual(result["state"], "completed")
         body = client.post_with_status.call_args.kwargs["json"]
         self.assertEqual(body["video_url"], SOURCE)
-        self.assertEqual(body["seconds"], 20)
+        # The upstream expects a string on the wire; CLI timing stays numeric.
+        self.assertEqual(body["seconds"], "20")
 
     def test_http_400_task_id_queries_existing_task_without_resubmit(self):
         client = Mock()
