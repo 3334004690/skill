@@ -11,7 +11,7 @@ author:
   name: aimaxhug
 license: Apache-2.0
 metadata:
-  tags: ai, image, text2image, image2image, image-edit, upload, video, text2video, minimax, minimax-h3, jimeng, seedance, omni, gemini, v2v, audio, text2speech, tts, search, web-search, baidu, social-media, douyin, xiaohongshu, xhs, aimaxhug
+  tags: ai, image, text2image, image2image, image-edit, upload, video, text2video, minimax, minimax-h3, jimeng, seedance, omni, muse, muse-video-pro, gemini, v2v, audio, text2speech, tts, search, web-search, baidu, social-media, douyin, xiaohongshu, xhs, aimaxhug
   requires:
     bins: [python3]
     python: ">=3.8"
@@ -100,6 +100,8 @@ python scripts/preflight.py --install-deps
 | AI 图像生成 | `scripts/ai_image.py` | [ai_image.md](references/ai_image.md) | 文生图、图生图，支持 7 个模型 |
 | AI 视频生成 | `scripts/minimax_video.py` | [即梦 / MiniMax](references/minimax_video.md) | 即梦 Seedance 与 MiniMax H3，支持文生视频、参考素材、图生视频、首尾帧和视频参考 |
 | Omni 视频生成 | `scripts/omni_video.py` | [omni_video.md](references/omni_video.md) | Omni 三个模型，支持文生视频、图片、首尾帧和 V2V 参考，当前输出约 10 秒 |
+| Muse 视频生成 | `scripts/muse_video.py` | [muse_video.md](references/muse_video.md) | `muse-video-pro`，支持首尾帧、最多 4 张参考图、视频参考、运镜和人物静音 |
+| 视频时长检测 | `scripts/video_duration.py` | [时长规则](references/muse_video.md#参考视频时长逻辑) | ffprobe 检测本地/URL 视频时长，检查源视频与目标时长的建议关系 |
 | 文件上传 | `scripts/upload.py` | [upload.md](references/upload.md) | 上传本地文件，返回临时 URL |
 | AI 音频生成 | `scripts/ai_audio.py` | [ai_audio.md](references/ai_audio.md) | 文生音频、音色描述、声音克隆，支持 MiniMax Speech 2.8 |
 | 百度 AI 搜索 | `scripts/ai_search.py` | [ai_search.md](references/ai_search.md) | 百度联网搜索，支持 GET / POST，返回可引用网页结果 |
@@ -207,9 +209,9 @@ python scripts/ai_image.py run --model nano-banana --prompt "一只猫" --count 
 
 详细见 [ai_image.md](references/ai_image.md)。
 
-### 二、视频生成（即梦 Seedance / MiniMax H3 / Omni）
+### 二、视频生成（即梦 Seedance / MiniMax H3 / Omni / Muse）
 
-视频生成支持三个系列：**即梦 Seedance**（`seedance2-0-pro-2`、`seedance2-5-pro-2`、`seedance-mini-2`）、**MiniMax H3**（`minimax-h3-*`）、**Omni**（`omni-fast-v2v-no-water`、`omni-fast`、`omni-fast-no-water`）。即梦 / MiniMax 调用 `scripts/minimax_video.py`，Omni 调用独立的 `scripts/omni_video.py`，参数表和示例见 [omni_video.md](references/omni_video.md)。先运行对应脚本的 `list-models` 获取参数范围；用户已指定模型或授权配参、直接提交时，按需求配齐参数并执行。运行时使用这两个已定义的脚本，不创建临时调用器、提示词文件或密钥配置。
+视频生成支持四个系列：**即梦 Seedance**（`seedance2-0-pro-2`、`seedance2-5-pro-2`、`seedance-mini-2`）、**MiniMax H3**（`minimax-h3-*`）、**Omni**（`omni-fast-v2v-no-water`、`omni-fast`、`omni-fast-no-water`）、**Muse Video Pro**（`muse-video-pro`）。即梦 / MiniMax 调用 `scripts/minimax_video.py`，Omni 调用 `scripts/omni_video.py`（[参数文档](references/omni_video.md)），Muse 调用 `scripts/muse_video.py`（[参数与时长规则](references/muse_video.md)）。先运行对应脚本的 `list-models` 获取参数范围；用户已指定模型或授权配参、直接提交时，按需求配齐参数并执行。运行时使用这些已定义的脚本，不创建临时调用器、提示词文件或密钥配置。
 
 遇到参数或素材问题，先检查路径、参数名、默认值及当前接口依据，修正授权范围内不改变目标的配置问题。仍有缺失素材、鉴权或本地校验冲突时，仅暂停受影响的提交并明确原因，继续其他独立可执行任务。不能为了凑出可执行方案，擅自换模型、改变时长、删参考图或把首尾帧控制降为普通参考图；也不能把 CLI 的限制直接归结为产品能力缺失。
 
@@ -217,6 +219,7 @@ python scripts/ai_image.py run --model nano-banana --prompt "一只猫" --count 
 cd <项目根目录>
 python scripts/minimax_video.py list-models
 python scripts/omni_video.py list-models
+python scripts/muse_video.py list-models
 ```
 
 **即梦 Seedance**（`--images` / `--videos` / `--audios` / `--resolution`）：2.0 与 Mini 2 的素材仅接受公网 HTTPS 直链；2.5 可传本地文件（脚本自动上传）或公网直链。下例中的 `media.example.com` 为占位域名，调用时替换为实际素材 HTTPS 直链。
@@ -264,13 +267,13 @@ python scripts/minimax_video.py run --model minimax-h3-pro-768p --prompt "提示
 >
 > 即梦三个模型都支持 `--images` / `--videos` / `--audios`；2.0 与 Mini 2 仅接受公网 HTTPS 素材 URL，Mini 2 使用视频或音频时必须至少提供一张图片。2.5 的 30/10/10 上限、2.0 的 HTTPS 约束及 Mini 2 的配置依据用户于 2026-11-02 提供的参数说明，未重新联网核实。MiniMax 的 `first_image`/`last_image` 不能与 `referenceImages` 同用，参考音频必须配参考图（合计不超过 15 秒），参考视频仅 Pro 且只能 1 段 2-5 秒。两种模型都不能混用对方的参数名，脚本会直接报错。
 >
-> 三个系列都提交到 `POST https://apis.aimaxhug.cloud/v1/videos`。Omni 与即梦按 `/v1/videos/{model}/{task_id}` 查询，MiniMax 保留 `/v1/videos/minimax-h3/{task_id}`。提交成功后必须立即向用户报告任务 ID，并持续轮询返回状态/进度，直到完成或失败。**每 10 秒查询一次，总期限 30 分钟（1800 秒）**；2K 和参考视频请求在高峰期可能排队。
+> 四个系列都提交到 `POST https://apis.aimaxhug.cloud/v1/videos`。Omni、Muse 与即梦按 `/v1/videos/{model}/{task_id}` 查询，MiniMax 保留 `/v1/videos/minimax-h3/{task_id}`。提交成功后必须立即向用户报告任务 ID，并持续轮询返回状态/进度，直到完成或失败。**每 10 秒查询一次，总期限 30 分钟（1800 秒）**；2K 和参考视频请求在高峰期可能排队。
 >
 > 如果提交响应是 HTTP 400 但响应体包含 `task_id`，不得丢弃任务或停止；必须保留该 ID，继续调用轮询接口查询最终状态。只有 400 且没有 `task_id` 时，才在提交阶段停止。
 >
 > 即梦 / MiniMax 的 `prompt` 按原有 7000 字符接口规则处理；**Omni 不设本地硬性长度上限，不截断提示词**。`duration` 未指定时按各模型默认值提交（即梦 2.0、Mini 2 与 MiniMax 为 5 秒，即梦 2.5 为 15 秒；Omni 为 10 秒）。
 >
-> 即梦 / MiniMax 的视频请求时长以 JSON 的 `duration` 字段为准，提示词中的时长描述应与参数一致。Omni 的 `seconds` / `duration` 仅表示请求值，**当前 Gemini 固定输出约 10 秒**，不能承诺传入时长就是实际视频时长。MiniMax 使用 `ratio`，即梦和 Omni 使用 `aspect_ratio`。
+> 即梦 / MiniMax 的视频请求时长以 JSON 的 `duration` 字段为准，提示词中的时长描述应与参数一致。Muse 以整数 `seconds` 提交。Omni 的 `seconds` / `duration` 仅表示请求值，**当前 Gemini 固定输出约 10 秒**，不能承诺传入时长就是实际视频时长。MiniMax 使用 `ratio`，即梦、Omni 和 Muse 使用 `aspect_ratio`。
 
 **Omni**：`--ratio` / `--aspect-ratio` 仅支持 `16:9`、`9:16`；`--seconds` 和 `--duration` 二选一；支持单图 `--image-url`（公网 URL 或图片 Base64）、首尾帧 `--first-image-url` / `--last-image-url`、源视频 `--video` / `--video-url` / `--videos`（合计最多 2 个）、多参考图 `--images`（最多 5 张）。远程素材须每个≤8MB、源视频≤1920×1080，具体检查范围见 [Omni 文档](references/omni_video.md)。
 
@@ -280,7 +283,16 @@ python scripts/omni_video.py run --model omni-fast-no-water --prompt "保持参�
 python scripts/omni_video.py run --model omni-fast-v2v-no-water --prompt "参考源视频动作生成连贯画面" --video-url https://media.example.com/action.mp4 --json
 ```
 
-详细见 [minimax_video.md](references/minimax_video.md)。
+**Muse Video Pro**：默认 `muse-video-pro`；必填 `--prompt`；`--aspect-ratio` 支持 `16:9` / `9:16` / `1:1` / `4:3` / `3:4`，默认 `16:9`；`--seconds` 支持 `5` / `8` / `10` / `20` / `30` / `40` / `50` / `60`，默认 5 秒，推荐 5–40 秒。支持 `--camera-motion`、`--negative-prompt`、首尾帧 URL 字符串 `--input-reference` / `--last-frame`、最多 4 张 URL/Base64 参考图 `--images`、参考视频 URL `--video-url`。`--mute-voice` 默认 false；true 时人物保留口型但禁配音，保留 SFX/Foley/BGM。
+
+使用 Muse 参考视频一般是视频续写，`seconds` 表示续写后的**目标总时长**，必须 ≥20 秒；脚本用 ffprobe 实测源视频，报告可续写余量（目标总秒数−源视频实测秒数），**源视频时长 ≥目标总时长则禁止提交**。源视频更短时，建议 ≤目标总时长−2 秒（20→18、30→28，依次类推）；余量不足 2 秒只提示，检测失败则不提交。本地素材先用独立脚本检测再上传，已上传的 URL 在生成前自动复查。独立检测用 `python scripts/video_duration.py <文件或URL> --seconds 20 --json`，无需 Key。首次配置和完整示例见 [muse_video.md](references/muse_video.md)。
+
+```bash
+python scripts/muse_video.py run --prompt "人物面向镜头说欢迎回来，保留自然口型和街道环境音" --seconds 10 --camera-motion zoom_in --mute-voice true --json
+python scripts/muse_video.py run --prompt "参考源视频动作生成连贯画面" --video-url https://media.example.com/action.mp4 --seconds 20 --json
+```
+
+即梦 / MiniMax 详细见 [minimax_video.md](references/minimax_video.md)。
 
 ### 模型选择指南
 
@@ -305,6 +317,7 @@ python scripts/omni_video.py run --model omni-fast-v2v-no-water --prompt "参考
 | 更长时长或更多素材 | **即梦 Seedance 2.5 Pro**（`seedance2-5-pro-2`）— 15 / 30 秒，图片≤30（含人像）/ 视频≤10 / 音频≤10 |
 | 指定 Mini 模型 | **即梦 Seedance Mini 2**（`seedance-mini-2`）— 4-15 秒、480p / 720p；视频或音频参考须配图 |
 | 指定 Omni 模型或 Omni V2V | **Omni**（`omni-fast` / `omni-fast-no-water` / `omni-fast-v2v-no-water`）— 约 10 秒、横/竖屏，参数见专用文档 |
+| 指定 Muse、人物静音口型或更长时长 | **Muse Video Pro**（`muse-video-pro`）— 推荐 5–40 秒、最多 4 张参考图；视频参考须生成 ≥20 秒 |
 | 当前 CLI 的首尾帧 / 参考视频驱动 | **MiniMax H3 Pro**（`minimax-h3-pro-768p` / `minimax-h3-pro-2k`）；不据此断言其他产品无首尾帧能力 |
 
 ---
@@ -366,6 +379,9 @@ python scripts/omni_video.py run --model omni-fast-v2v-no-water --prompt "参考
 | 参考视频驱动（MiniMax H3 Pro） | Available | `scripts/minimax_video.py run --model minimax-h3-pro-768p --reference-videos <视频>` |
 | 文生视频 / 图片及首尾帧参考（Omni） | Available | `scripts/omni_video.py run --model omni-fast --prompt <提示词>`（也支持 `omni-fast-no-water`） |
 | 视频参考（Omni V2V） | Available | `scripts/omni_video.py run --model omni-fast-v2v-no-water --prompt <提示词> --video-url <视频URL>` |
+| 文生视频 / 首尾帧 / 多参考图（Muse） | Available | `scripts/muse_video.py run --prompt <提示词>`（默认 `muse-video-pro`，可选 `--mute-voice true`） |
+| 视频参考（Muse） | Available | `scripts/muse_video.py run --prompt <提示词> --video-url <视频URL> --seconds 20`（自动检测时长） |
+| 视频时长检测 | Available | `scripts/video_duration.py <文件或URL> --seconds 20 --json`（需 ffprobe，无需 Key） |
 | 列出视频模型 | Available | `scripts/minimax_video.py list-models` |
 | 文生音频 | Available | `scripts/ai_audio.py run`（短文本 `/v1/minimax/audio`） |
 | 长文本音频 | Available | `scripts/ai_audio.py run --long`（`/v1/minimax/audio/long`） |
