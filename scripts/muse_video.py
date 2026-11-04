@@ -3,6 +3,7 @@
 
 POST /v1/videos, then GET /v1/videos/muse-video-pro/{task_id}.
 Reference videos are probed before submission; JSON logs go to stderr.
+API seconds is a string; duration validation and arithmetic stay numeric.
 """
 
 import argparse
@@ -79,7 +80,7 @@ def build_body(args):
     if len(args.images or []) > 4:
         raise ValueError("images 最多 4 张")
     body = {"model": args.model, "prompt": args.prompt.strip(), "aspect_ratio": args.aspect_ratio,
-            "seconds": args.seconds, "mute_voice": args.mute_voice}
+            "seconds": str(args.seconds), "mute_voice": args.mute_voice}
     for field in ("camera_motion", "negative_prompt"):
         value = getattr(args, field)
         if value is not None:
@@ -98,13 +99,14 @@ def build_body(args):
 
 
 def preflight(body, ffprobe="ffprobe"):
+    seconds = int(body["seconds"])
     warnings = []
-    if body["seconds"] > 40:
+    if seconds > 40:
         warnings.append("为稳定产出，推荐选择 5–40 秒；50 / 60 秒仍可提交。")
     result = {"warnings": warnings}
     if body.get("video_url"):
         duration = probe_video_duration(body["video_url"], ffprobe)
-        result["reference_video"] = reference_timing(duration, body["seconds"])
+        result["reference_video"] = reference_timing(duration, seconds)
         warnings.extend(result["reference_video"]["warnings"])
     return result
 
@@ -316,6 +318,7 @@ def main(argv=None):
     if args.command == "list-models":
         result = {"model": MODEL, "aspect_ratio": list(RATIOS), "seconds": list(SECONDS),
                   "default_seconds": 5, "recommended_seconds": [5, 8, 10, 20, 30, 40],
+                  "seconds_api_type": "string",
                   "camera_motion_examples": list(CAMERA_MOTIONS), "max_images": 4,
                   "mute_voice_default": False, "reference_min_output_seconds": 20,
                   "reference_source_must_be_shorter_than_output": True,
@@ -342,7 +345,7 @@ def main(argv=None):
                       "preflight": checks}, args.json)
                 return 0
             result = generate(AimaxhugClient(), body, args.poll_timeout)
-            result.update(seconds=body["seconds"], aspect_ratio=body["aspect_ratio"], preflight=checks)
+            result.update(seconds=args.seconds, aspect_ratio=body["aspect_ratio"], preflight=checks)
         else:
             task_id = args.task_id.strip()
             if not task_id:

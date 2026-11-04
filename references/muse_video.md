@@ -47,7 +47,7 @@
 | `model` | string | `--model`，默认且仅支持 `muse-video-pro` |
 | `prompt` | string | `--prompt`，必填且非空，不截断 |
 | `aspect_ratio` | string | `--aspect-ratio` / `--ratio`，支持 `16:9`、`9:16`、`1:1`、`4:3`、`3:4`，本地默认 `16:9` |
-| `seconds` | integer | `--seconds`，目标视频总时长；续写时包含源视频已有时长。支持 `5`、`8`、`10`、`20`、`30`、`40`、`50`、`60`；本地默认 `5`，推荐 **5–40 秒**稳定产出 |
+| `seconds` | string | `--seconds`，目标视频总时长；续写时包含源视频已有时长。支持 `"5"`、`"8"`、`"10"`、`"20"`、`"30"`、`"40"`、`"50"`、`"60"`；本地默认 5 秒，推荐 **5–40 秒**稳定产出 |
 | `camera_motion` | string | `--camera-motion`，例如 `pan_left`、`zoom_in`、`orbit`、`tracking_shot`、`static`；这些是示例，不是本地硬性枚举 |
 | `negative_prompt` | string | `--negative-prompt`，负面提示词 |
 | `input_reference` | string | `--input-reference`，首帧 HTTP(S) URL，单个字符串 |
@@ -60,7 +60,7 @@ API 中含下划线的字段也支持同名 CLI 别名，如 `--input_reference`
 
 首尾帧和 `video_url` 的内部请求字段仅接受 URL 字符串。本地素材由 AI 先调用项目上传脚本，再把返回地址填入这些字段；这是内部处理步骤，不是要求用户提供某种格式的素材。没有额外规定首尾帧与 `images` 互斥，也不要求尾帧必须搭配首帧。本地校验 URL/Base64 的格式，不代表已核实图片实际内容或远程素材可达性。
 
-`seconds` 包含 `50`，已由用户确认。参考视频须在提交前实测时长，避免使用等于或超过目标生成时长的素材。
+`seconds` 包含 `50`，已由用户确认。**接口 JSON 的 `seconds` 必须是字符串，例如 `"seconds": "20"`，不能发送数字 `"seconds": 20`**；后者会触发 `cannot unmarshal number into Go struct field .Alias.seconds of type string`。CLI 仍写 `--seconds 20`，脚本负责转换；`--dry-run` 的请求预览与实际提交保持相同字段类型。时长检测、续写余量和结果中的秒数保持数值计算，`mute_voice` 保持 boolean。AI 使用现有 CLI，不根据旧参数表另写请求。参考视频须在提交前实测时长，避免使用等于或超过目标生成时长的素材。
 
 ## 参考视频时长逻辑
 

@@ -15,7 +15,7 @@ from unittest.mock import Mock, patch
 
 import muse_video as muse
 import video_duration as duration
-from shared_client import AimaxhugError
+from shared_client import AimaxhugClient, AimaxhugError
 
 
 SOURCE = "https://media.example.com/source.mp4"
@@ -43,7 +43,7 @@ class MuseTests(unittest.TestCase):
         self.assertEqual(code, 0)
         self.assertFalse(result["submitted"])
         self.assertEqual(result["request_preview"], {"model": "muse-video-pro", "prompt": "提示词",
-                         "aspect_ratio": "16:9", "seconds": 5, "mute_voice": False})
+                         "aspect_ratio": "16:9", "seconds": "5", "mute_voice": False})
         client.assert_not_called()
         probe.assert_not_called()
 
@@ -63,7 +63,7 @@ class MuseTests(unittest.TestCase):
         self.assertIsInstance(body["last_frame"], str)
         self.assertEqual(len(body["images"]), 4)
         self.assertIs(body["mute_voice"], True)
-        self.assertEqual(body["seconds"], 10)
+        self.assertEqual(body["seconds"], "10")
         self.assertNotIn("duration", body)
         self.assertNotIn("ratio", body)
 
@@ -80,10 +80,41 @@ class MuseTests(unittest.TestCase):
             for ratio in muse.RATIOS:
                 with self.subTest(seconds=seconds, ratio=ratio):
                     body = self.body(seconds=seconds, aspect_ratio=ratio)
-                    self.assertEqual(body["seconds"], seconds)
+                    self.assertEqual(body["seconds"], str(seconds))
                     self.assertEqual(body["aspect_ratio"], ratio)
                     checks = muse.preflight(body)
                     self.assertEqual(bool(checks["warnings"]), seconds > 40)
+
+    def test_serialized_http_request_matches_preview_for_every_duration(self):
+        import requests
+
+        for seconds in muse.SECONDS:
+            for muted in ("false", "true"):
+                with self.subTest(seconds=seconds, muted=muted):
+                    flags = ("run", "--prompt", "人物面向镜头说话", "--seconds", str(seconds),
+                             "--mute-voice", muted, "--json")
+                    code, preview, _ = self.cli(*flags, "--dry-run")
+                    self.assertEqual(code, 0)
+                    payloads = []
+
+                    def post(url, **kwargs):
+                        prepared = requests.Request("POST", url, json=kwargs["json"]).prepare()
+                        payloads.append(json.loads(prepared.body))
+                        return SimpleNamespace(status_code=200,
+                            json=lambda: {"status": "completed", "video_url": OUTPUT})
+
+                    client = AimaxhugClient(api_key="offline-test-only")
+                    client._requests = SimpleNamespace(post=Mock(side_effect=post), exceptions=requests.exceptions)
+                    with patch.object(muse, "AimaxhugClient", return_value=client), \
+                            patch("shared_download.env_save_dir", return_value=None):
+                        code, result, _ = self.cli(*flags)
+                    self.assertEqual(code, 0)
+                    self.assertEqual(result["state"], "completed")
+                    self.assertEqual(result["seconds"], seconds)
+                    client._requests.post.assert_called_once()
+                    self.assertEqual(payloads, [preview["request_preview"]])
+                    self.assertEqual(payloads[0]["seconds"], str(seconds))
+                    self.assertIs(payloads[0]["mute_voice"], muted == "true")
 
     def test_invalid_prompt_image_count_and_media(self):
         invalid = ({"prompt": "  "}, {"images": [IMAGE] * 5}, {"input_reference": "local.png"},
