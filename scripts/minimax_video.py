@@ -3,10 +3,11 @@
 
 Two model families are exposed behind a single CLI:
 
-* **即梦 Seedance** — ``seedance2-0-pro-2`` / ``seedance2-5-pro-2`` /
-  ``seedance-mini-2``. Text-to-video and reference-driven video. 2.0 and Mini
-  accept public HTTPS reference URLs only; 2.5 also uploads local references.
-  The aspect ratio is sent as ``aspect_ratio`` and size as ``resolution``.
+* **即梦 Seedance** — legacy Pro/Mini models and ``seedance-2.0-720p-3`` /
+  ``seedance-2.5-720p-3``. Legacy 2.0/Mini accept public HTTPS references;
+  legacy 2.5 also uploads local references. The 720p-3 models accept public
+  HTTP(S) URLs and send ``seconds`` with fixed 720p output. All use
+  ``aspect_ratio``; only legacy models send ``resolution``.
 
 * **MiniMax H3** — ``minimax-h3-*``.
   Text-to-video, image-to-video, first/last-frame and reference-video driven.
@@ -50,6 +51,7 @@ MAX_DURATION_PROBE_BYTES = 100 * 1024 * 1024
 
 # 即梦 Seedance 与 MiniMax H3 使用不同的画幅集合：Seedance 没有 adaptive。
 SEEDANCE_RATIOS = ("16:9", "9:16", "1:1", "21:9", "4:3", "3:4")
+SEEDANCE_720P_3_RATIOS = ("6:9", "9:16", "1:1")
 MINIMAX_RATIOS = ("16:9", "9:16", "1:1", "21:9", "4:3", "3:4", "adaptive")
 
 # 模型注册表。`family` 决定提交字段、参考素材处理方式和轮询路径。
@@ -88,6 +90,34 @@ VIDEO_MODELS = {
         "limits": {"image": 9, "video": 3, "audio": 3},
         "public_https_only": True,
         "image_required_for_video_audio": True,
+    },
+    "seedance-2.0-720p-3": {
+        "name": "即梦 Seedance 2.0 720p 稳定版",
+        "family": "seedance",
+        "duration": {"type": "choice", "options": (15, 30), "default": 15},
+        "duration_field": "seconds",
+        "ratios": SEEDANCE_720P_3_RATIOS,
+        "resolutions": ("720p",),
+        "default_resolution": "720p",
+        "fixed_resolution": "720p",
+        "assets": ("image",),
+        "limits": {"image": 9, "video": 0, "audio": 0},
+        "public_url_only": True,
+        "billing": "per_request",
+    },
+    "seedance-2.5-720p-3": {
+        "name": "即梦 Seedance 2.5 720p 稳定版",
+        "family": "seedance",
+        "duration": {"type": "range", "min": 5, "max": 30, "default": 5},
+        "duration_field": "seconds",
+        "ratios": SEEDANCE_720P_3_RATIOS,
+        "resolutions": ("720p",),
+        "default_resolution": "720p",
+        "fixed_resolution": "720p",
+        "assets": ("image", "video", "audio"),
+        "limits": {"image": 30, "video": 10, "audio": 10},
+        "public_url_only": True,
+        "billing": "per_request",
     },
     # ---------------- MiniMax H3 ----------------
     "minimax-h3-768p": {
@@ -236,16 +266,18 @@ def _validate_duration_constraints(args):
 
 
 # ---------------------------------------------------------------------------
-# 即梦 Seedance reference media (2.0/Mini: HTTPS URLs; 2.5: upload or URL)
+# 即梦 Seedance reference media (rules are selected by the full model key)
 # ---------------------------------------------------------------------------
-def _public_https_reference(value, label):
+def _public_reference(value, label, https_only=False):
     """Reject malformed URLs and obvious nonpublic hosts without network/DNS calls."""
-    message = f"{label}仅接受公网 HTTPS URL；本地素材请先上传并取得 HTTPS 直链"
+    protocol = "HTTPS" if https_only else "HTTP(S)"
+    schemes = ("https",) if https_only else ("http", "https")
+    message = f"{label}仅接受公网 {protocol} URL；本地素材请先上传并取得公网直链"
     try:
         parts = urlparse(value)
         host = (parts.hostname or "").lower().rstrip(".")
         port = parts.port
-        if (parts.scheme.lower() != "https" or not host
+        if (parts.scheme.lower() not in schemes or not host
                 or parts.username is not None or parts.password is not None
                 or any(char.isspace() for char in value) or "\\" in value
                 or (port is not None and port == 0)):
@@ -263,6 +295,10 @@ def _public_https_reference(value, label):
     except ValueError as exc:
         raise ValueError(message) from exc
     return value
+
+
+def _public_https_reference(value, label):
+    return _public_reference(value, label, https_only=True)
 
 
 def _upload_reference(client, value, label):
@@ -291,6 +327,8 @@ def _seedance_references(client, values, label, model):
         return []
     if model.get("public_https_only"):
         return [_public_https_reference(value, label) for value in values]
+    if model.get("public_url_only"):
+        return [_public_reference(value, label) for value in values]
     return [_upload_reference(client, value, label) for value in values]
 
 
@@ -299,16 +337,17 @@ def _seedance_references(client, values, label, model):
 # ---------------------------------------------------------------------------
 def _resolve_duration(args, model):
     spec = model["duration"]
+    field = model.get("duration_field", "duration")
     if args.duration is None:
         return spec["default"]
     if spec["type"] == "range":
         if not spec["min"] <= args.duration <= spec["max"]:
             raise ValueError(
-                f"{model['name']} 的 duration 必须为 {spec['min']}-{spec['max']} 秒"
+                f"{model['name']} 的 {field} 必须为 {spec['min']}-{spec['max']} 秒"
             )
     elif args.duration not in spec["options"]:
         raise ValueError(
-            f"{model['name']} 的 duration 必须是: "
+            f"{model['name']} 的 {field} 必须是: "
             + " / ".join(str(option) for option in spec["options"])
             + " 秒"
         )
@@ -334,11 +373,11 @@ def _validate_seedance_args(args, model):
             and (counts["video"] or counts["audio"]) and not counts["image"]):
         raise ValueError(f"{model['name']} 使用视频或音频参考时，必须至少提供一张 --images 图片")
 
-    if model.get("public_https_only"):
+    if model.get("public_https_only") or model.get("public_url_only"):
         for values, label in ((args.images, "参考图"), (args.videos, "参考视频"),
                               (args.audios, "参考音频")):
             for value in values or []:
-                _public_https_reference(value, label)
+                _public_reference(value, label, https_only=model.get("public_https_only", False))
 
     if args.reference_images or args.reference_audios or args.reference_videos \
             or args.first_image or args.last_image:
@@ -405,10 +444,11 @@ def _build_seedance_body(client, args, model, duration):
     body = {
         "model": args.model,
         "prompt": args.prompt.strip(),
-        "duration": duration,
+        model.get("duration_field", "duration"): duration,
         "aspect_ratio": args.ratio or model["ratios"][0],
-        "resolution": args.resolution or model["default_resolution"],
     }
+    if not model.get("fixed_resolution"):
+        body["resolution"] = args.resolution or model["default_resolution"]
     images = _seedance_references(client, args.images, "参考图", model)
     videos = _seedance_references(client, args.videos, "参考视频", model)
     audios = _seedance_references(client, args.audios, "参考音频", model)
@@ -581,7 +621,7 @@ def _poll_endpoint(model, task_id):
 def _submit_and_wait(client, body, poll_timeout):
     print(
         f"📨 POST {VIDEO_ENDPOINT} | model={body.get('model')} | "
-        f"duration={body.get('duration')} | "
+        f"seconds={body.get('seconds', body.get('duration'))} | "
         f"ratio={body.get('ratio') or body.get('aspect_ratio') or '未指定'} | "
         f"resolution={body.get('resolution', '未指定')} | "
         f"referenceImages={len(body.get('referenceImages', body.get('images', [])))}",
@@ -667,7 +707,12 @@ def cmd_list_models(args):
         for index, (key, model) in enumerate(selected.items(), 1):
             spec = model["duration"]
             timing = f"{spec['min']}–{spec['max']} 秒" if spec["type"] == "range" else " / ".join(map(str, spec["options"])) + " 秒"
-            purpose = "图片、视频和声音参考" if model["family"] == "seedance" else "图片参考或开头、结尾画面"
+            if model["family"] == "seedance":
+                purpose = "图片参考" if model["assets"] == ("image",) else "图片、视频和声音参考"
+            else:
+                purpose = "图片参考或开头、结尾画面"
+            if model.get("billing") == "per_request":
+                purpose += "，固定 720p、按次收费"
             if model.get("tier") == "pro":
                 purpose += "，也支持短视频参考"
             choices.append(((f"**{index} · {model['name']}（默认推荐）**" if key == "seedance2-0-pro-2"
@@ -683,8 +728,14 @@ def cmd_list_models(args):
             ("⏱️ 视频时长", f"**默认 {spec['default']} 秒**；可选 {timing}"),
             ("🖼️ 画面比例", ratio_choices(model["ratios"]))]
     if model["family"] == "seedance":
-        rows.extend([("✨ 清晰度", f"**默认 {model['default_resolution']}**；可选 " + " / ".join(model["resolutions"])),
-                     ("📎 参考素材", f"图片最多 {model['limits']['image']} 张、视频最多 {model['limits']['video']} 段、声音最多 {model['limits']['audio']} 个")])
+        clarity = (f"**固定 {model['fixed_resolution']}**" if model.get("fixed_resolution")
+                   else f"**默认 {model['default_resolution']}**；可选 " + " / ".join(model["resolutions"]))
+        asset_labels = {"image": ("图片", "张"), "video": ("视频", "段"), "audio": ("声音", "个")}
+        references = "、".join(f"{asset_labels[kind][0]}最多 {model['limits'][kind]} {asset_labels[kind][1]}"
+                              for kind in model["assets"])
+        rows.extend([("✨ 清晰度", clarity), ("📎 参考素材", references)])
+        if model.get("billing") == "per_request":
+            rows.append(("💰 计费方式", "按次收费"))
         if model.get("image_required_for_video_audio"):
             rows.append(("💡 素材搭配", "使用视频或声音参考时，请同时提供至少一张参考图片"))
     else:
@@ -701,18 +752,18 @@ def add_generate_args(parser):
     parser.add_argument("--model", choices=list(VIDEO_MODELS), default="seedance2-0-pro-2",
                         help="视频模型 key（默认: seedance2-0-pro-2）")
     parser.add_argument("--prompt", required=True, help="视频提示词，最多 7000 字符")
-    parser.add_argument("--duration", type=int, default=None,
-                        help="视频时长（秒）；即梦 2.0 / Mini 与 MiniMax 为 4-15，2.5 为 15/30")
-    parser.add_argument("--ratio", default=None,
+    parser.add_argument("--duration", "--seconds", dest="duration", type=int, default=None,
+                        help="整数秒数，范围见 list-models；720p-3 按 seconds 提交，旧模型按 duration 提交")
+    parser.add_argument("--ratio", "--aspect-ratio", "--aspect_ratio", dest="ratio", default=None,
                         help="画幅比例；即梦按 aspect_ratio 提交，MiniMax 按 ratio 提交")
     parser.add_argument("--resolution", default=None,
-                        help="即梦专用分辨率：480p / 720p")
+                        help="即梦分辨率：旧模型 480p / 720p；720p-3 固定 720p，不发送 resolution")
     parser.add_argument("--images", nargs="+", default=None,
-                        help="即梦参考图：2.0/Mini 最多 9 个公网 HTTPS URL；2.5 最多 30 个路径/URL")
+                        help="即梦参考图：2.0/Mini 最多 9 张，2.5 最多 30 张；720p-3 仅公网 URL，旧模型见 list-models")
     parser.add_argument("--videos", nargs="+", default=None,
-                        help="即梦参考视频：2.0/Mini 最多 3 个公网 HTTPS URL；2.5 最多 10 个路径/URL；Mini 须配图")
+                        help="即梦参考视频：2.0 720p-3 不支持；2.5 最多 10 段；旧 2.0/Mini 最多 3 段，Mini 须配图")
     parser.add_argument("--audios", nargs="+", default=None,
-                        help="即梦参考音频：2.0/Mini 最多 3 个公网 HTTPS URL；2.5 最多 10 个路径/URL；Mini 须配图")
+                        help="即梦参考音频：2.0 720p-3 不支持；2.5 最多 10 个；旧 2.0/Mini 最多 3 个，Mini 须配图")
     parser.add_argument("--reference-images", nargs="+", default=None,
                         help="MiniMax 参考图 URL、data URI 或本地文件，最多 5 个")
     parser.add_argument("--reference-audios", nargs="+", default=None,
@@ -746,9 +797,9 @@ def cmd_run(args):
 
     mode = _mode_for(model, args)
     print(
-        f"🎬 正在使用 {model['name']} 进行{mode}，提交配置：duration={body['duration']} 秒"
+        f"🎬 正在使用 {model['name']} 进行{mode}，提交配置：{model.get('duration_field', 'duration')}={duration} 秒"
         f"，ratio={body.get('ratio') or body.get('aspect_ratio', '默认')}"
-        f"，resolution={body.get('resolution', '默认')}；提交任务并等待完成...",
+        f"，resolution={model.get('fixed_resolution') or body.get('resolution', '默认')}；提交任务并等待完成...",
         file=sys.stderr,
     )
 
@@ -766,11 +817,13 @@ def cmd_run(args):
         "model": args.model,
         "model_name": model["name"],
         "prompt": body["prompt"],
-        "duration": body["duration"],
+        "duration": duration,
         "ratio": body.get("ratio") or body.get("aspect_ratio"),
-        "resolution": body.get("resolution"),
+        "resolution": model.get("fixed_resolution") or body.get("resolution"),
         "mode": mode,
     }
+    if "seconds" in body:
+        result["seconds"] = body["seconds"]
     # 宿主注入 SKILL_OUTPUT_DIR 时下载到该目录（agent 直接引用本地路径，无需自行下载）
     from shared_download import download_to_local, env_save_dir
     save_dir = env_save_dir()
@@ -790,7 +843,7 @@ def cmd_run(args):
         print(f"🎬 [点击播放]({video_url})")
         print(f"🤖 模型: {model['name']}")
         print(f"📋 模式: {mode}")
-        print(f"⏱ 时长: {body['duration']} 秒")
+        print(f"⏱ 时长: {duration} 秒")
         if result["ratio"]:
             print(f"📐 比例: {result['ratio']}")
         if result["resolution"]:

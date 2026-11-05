@@ -215,7 +215,7 @@ python scripts/ai_image.py run --model nano-banana --prompt "一只猫" --count 
 
 ### 二、视频生成（即梦 Seedance / MiniMax H3 / Omni / Muse）
 
-视频生成支持四个系列：**即梦 Seedance**（`seedance2-0-pro-2`、`seedance2-5-pro-2`、`seedance-mini-2`）、**MiniMax H3**（`minimax-h3-*`）、**Omni**（`omni-fast-v2v-no-water`、`omni-fast`、`omni-fast-no-water`）、**Muse Video Pro**（`muse-video-pro`）。即梦 / MiniMax 调用 `scripts/minimax_video.py`，Omni 调用 `scripts/omni_video.py`（[参数文档](references/omni_video.md)），Muse 调用 `scripts/muse_video.py`（[参数与时长规则](references/muse_video.md)）。先运行对应脚本的 `list-models` 获取参数范围；用户已指定模型或授权配参、直接提交时，按需求配齐参数并执行。运行时使用这些已定义的脚本，不创建临时调用器、提示词文件或密钥配置。
+视频生成支持四个系列：**即梦 Seedance**（`seedance2-0-pro-2`、`seedance2-5-pro-2`、`seedance-mini-2`、`seedance-2.0-720p-3`、`seedance-2.5-720p-3`）、**MiniMax H3**（`minimax-h3-*`）、**Omni**（`omni-fast-v2v-no-water`、`omni-fast`、`omni-fast-no-water`）、**Muse Video Pro**（`muse-video-pro`）。即梦 / MiniMax 调用 `scripts/minimax_video.py`，Omni 调用 `scripts/omni_video.py`（[参数文档](references/omni_video.md)），Muse 调用 `scripts/muse_video.py`（[参数与时长规则](references/muse_video.md)）。先运行对应脚本的 `list-models` 获取参数范围；用户已指定模型或授权配参、直接提交时，按需求配齐参数并执行。运行时使用这些已定义的脚本，不创建临时调用器、提示词文件或密钥配置。
 
 遇到参数或素材问题，先检查路径、参数名、默认值及当前接口依据，修正授权范围内不改变目标的配置问题。仍有缺失素材、鉴权或本地校验冲突时，仅暂停受影响的提交并明确原因，继续其他独立可执行任务。不能为了凑出可执行方案，擅自换模型、改变时长、删参考图或把首尾帧控制降为普通参考图；也不能把 CLI 的限制直接归结为产品能力缺失。
 
@@ -226,7 +226,7 @@ python scripts/omni_video.py list-models
 python scripts/muse_video.py list-models
 ```
 
-**即梦 Seedance**（`--images` / `--videos` / `--audios` / `--resolution`）：2.0 与 Mini 2 的素材仅接受公网 HTTPS 直链；2.5 可传本地文件（脚本自动上传）或公网直链。下例中的 `media.example.com` 为占位域名，调用时替换为实际素材 HTTPS 直链。
+**原有即梦 Seedance Pro / Mini**（`--images` / `--videos` / `--audios` / `--resolution`）：旧款 2.0 与 Mini 2 的素材仅接受公网 HTTPS 直链；旧款 2.5 可传本地文件（脚本自动上传）或公网直链。下例中的 `media.example.com` 为占位域名，调用时替换为实际素材 HTTPS 直链。
 
 ```bash
 # 文生视频（2.0：4-15 秒）
@@ -240,6 +240,13 @@ python scripts/minimax_video.py run --model seedance2-5-pro-2 --prompt "提示�
 
 # Mini 2：4-15 秒，素材上限 9/3/3；视频或音频参考必须至少搭配一张图片
 python scripts/minimax_video.py run --model seedance-mini-2 --prompt "保持人像特征，参考动作节奏" --images https://media.example.com/photo.jpg --videos https://media.example.com/clip.mp4 --duration 5 --ratio 16:9 --resolution 480p
+```
+
+**新增即梦 720p-3 稳定版**（两款均固定 720p、按次收费）：`seedance-2.0-720p-3` 仅支持 15 / 30 秒、最多 9 张图片，不支持音频或视频参考；`seedance-2.5-720p-3` 支持 5–30 整数秒、图片≤30 / 音频≤10 / 视频≤10。两款比例仅 `6:9` / `9:16` / `1:1`，素材仅接受公网 URL 数组；本地素材先通过已有上传脚本取得 `tmp_url`。CLI 默认秒数分别为 15 / 5，比例默认 6:9。请求使用 `model` / `prompt` / `seconds` / `aspect_ratio`，不发送 `duration` / `resolution`；`--duration` 为 `--seconds` 的别名。完整 JSON 与图音视频参考案例见 [720p-3 参数](references/minimax_video.md#seedance-720p-3-参数与请求示例)。配置及稳定性说明依据用户 2026-11-05 提供的信息。
+
+```bash
+python scripts/minimax_video.py run --model seedance-2.0-720p-3 --prompt "保持参考人物特征，镜头缓慢推进" --seconds 15 --aspect-ratio 6:9 --images https://example.com/reference.png --json
+python scripts/minimax_video.py run --model seedance-2.5-720p-3 --prompt "保持参考人物形象，参考动作与音乐节奏" --seconds 20 --aspect-ratio 9:16 --images https://example.com/reference.png --audios https://example.com/reference.mp3 --videos https://example.com/reference.mp4 --json
 ```
 
 **MiniMax H3**（`--reference-images` / `--reference-audios` / `--reference-videos` / `--first-image` / `--last-image`；参考素材可传公网直链、data URI 或本地文件）：
@@ -258,7 +265,7 @@ python scripts/minimax_video.py run --model minimax-h3-2k --prompt "提示词" -
 python scripts/minimax_video.py run --model minimax-h3-pro-768p --prompt "提示词" --reference-videos source.mp4 --duration 5 --ratio 16:9
 ```
 
-> **当前 CLI 参数速查**（本地规则，非服务端全部能力；争议项及在线来源见参考文档）：
+> **原有即梦 Pro / Mini 与 MiniMax CLI 参数速查**（720p-3 见上文；本地规则，非服务端全部能力；争议项及在线来源见参考文档）：
 >
 > | 参数 | 即梦 Seedance | MiniMax H3 |
 > |------|--------------|------------|
@@ -269,15 +276,15 @@ python scripts/minimax_video.py run --model minimax-h3-pro-768p --prompt "提示
 > | 提交字段 | `aspect_ratio` / `resolution` / `images` / `videos` / `audios` | `ratio` / `referenceImages` / `referenceAudios` / `referenceVideos` / `first_image` / `last_image` |
 > | 轮询路径 | `/v1/videos/{model}/{task_id}` | `/v1/videos/minimax-h3/{task_id}` |
 >
-> 即梦三个模型都支持 `--images` / `--videos` / `--audios`；2.0 与 Mini 2 仅接受公网 HTTPS 素材 URL，Mini 2 使用视频或音频时必须至少提供一张图片。2.5 的 30/10/10 上限、2.0 的 HTTPS 约束及 Mini 2 的配置依据用户于 2026-11-02 提供的参数说明，未重新联网核实。MiniMax 的 `first_image`/`last_image` 不能与 `referenceImages` 同用，参考音频必须配参考图（合计不超过 15 秒），参考视频仅 Pro 且只能 1 段 2-5 秒。两种模型都不能混用对方的参数名，脚本会直接报错。
+> 原有即梦三个 Pro / Mini 模型都支持 `--images` / `--videos` / `--audios`；旧款 2.0 与 Mini 2 仅接受公网 HTTPS 素材 URL，Mini 2 使用视频或音频时必须至少提供一张图片。旧款 2.5 的 30/10/10 上限、旧款 2.0 的 HTTPS 约束及 Mini 2 的配置依据用户于 2026-11-02 提供的参数说明，未重新联网核实。新款 2.0 720p-3 仅支持图片参考，不套用此表。MiniMax 的 `first_image`/`last_image` 不能与 `referenceImages` 同用，参考音频必须配参考图（合计不超过 15 秒），参考视频仅 Pro 且只能 1 段 2-5 秒。两种模型都不能混用对方的参数名，脚本会直接报错。
 >
 > 四个系列都提交到 `POST https://apis.aimaxhug.cloud/v1/videos`。Omni、Muse 与即梦按 `/v1/videos/{model}/{task_id}` 查询，MiniMax 保留 `/v1/videos/minimax-h3/{task_id}`。提交成功后必须立即向用户报告任务 ID，并持续轮询返回状态/进度，直到完成或失败。**每 10 秒查询一次，总期限 30 分钟（1800 秒）**；2K 和参考视频请求在高峰期可能排队。
 >
 > 如果提交响应是 HTTP 400 但响应体包含 `task_id`，不得丢弃任务或停止；必须保留该 ID，继续调用轮询接口查询最终状态。只有 400 且没有 `task_id` 时，才在提交阶段停止。
 >
-> 即梦 / MiniMax 的 `prompt` 按原有 7000 字符接口规则处理；**Omni 不设本地硬性长度上限，不截断提示词**。`duration` 未指定时按各模型默认值提交（即梦 2.0、Mini 2 与 MiniMax 为 5 秒，即梦 2.5 为 15 秒；Omni 为 10 秒）。
+> 即梦 / MiniMax 的 `prompt` 按原有 7000 字符接口规则处理；**Omni 不设本地硬性长度上限，不截断提示词**。秒数未指定时按 CLI 默认值提交（旧款即梦 2.0、Mini 2 与 MiniMax 为 5 秒，旧款即梦 2.5 为 15 秒；新款 2.0 / 2.5 720p-3 分别为 15 / 5 秒；Omni 为 10 秒）。
 >
-> 即梦 / MiniMax 的视频请求时长以 JSON 的 `duration` 字段为准，提示词中的时长描述应与参数一致。Muse 以整数 `seconds` 提交。Omni 的 `seconds` / `duration` 仅表示请求值，**当前 Gemini 固定输出约 10 秒**，不能承诺传入时长就是实际视频时长。MiniMax 使用 `ratio`，即梦、Omni 和 Muse 使用 `aspect_ratio`。
+> 新款即梦 720p-3 以整数 `seconds` 提交时长；旧款即梦 Pro / Mini 与 MiniMax 使用 `duration`，提示词中的时长描述应与参数一致。Muse 以整数 `seconds` 提交。Omni 的 `seconds` / `duration` 仅表示请求值，**当前 Gemini 固定输出约 10 秒**，不能承诺传入时长就是实际视频时长。MiniMax 使用 `ratio`，即梦、Omni 和 Muse 使用 `aspect_ratio`。
 
 **Omni**：`--ratio` / `--aspect-ratio` 仅支持 `16:9`、`9:16`；`--seconds` 和 `--duration` 二选一；支持单图 `--image-url`（公网 URL 或图片 Base64）、首尾帧 `--first-image-url` / `--last-image-url`、源视频 `--video` / `--video-url` / `--videos`（合计最多 2 个）、多参考图 `--images`（最多 5 张）。远程素材须每个≤8MB、源视频≤1920×1080，具体检查范围见 [Omni 文档](references/omni_video.md)。
 
@@ -322,6 +329,8 @@ python scripts/muse_video.py run --prompt "参考源视频动作生成连贯画�
 | 默认首选 | **即梦 Seedance 2.0 Pro**（`seedance2-0-pro-2`）— 4-15 秒，支持图片 / 视频 / 音频参考 |
 | 更长时长或更多素材 | **即梦 Seedance 2.5 Pro**（`seedance2-5-pro-2`）— 15 / 30 秒，图片≤30（含人像）/ 视频≤10 / 音频≤10 |
 | 指定 Mini 模型 | **即梦 Seedance Mini 2**（`seedance-mini-2`）— 4-15 秒、480p / 720p；视频或音频参考须配图 |
+| 稳定版、按次收费、仅图片参考 | **即梦 Seedance 2.0 720p 稳定版**（`seedance-2.0-720p-3`）— 15 / 30 秒，图片≤9；比例 6:9 / 9:16 / 1:1 |
+| 稳定版、按次收费、多素材参考 | **即梦 Seedance 2.5 720p 稳定版**（`seedance-2.5-720p-3`）— 5–30 秒，图片≤30 / 音频≤10 / 视频≤10；比例 6:9 / 9:16 / 1:1 |
 | 指定 Omni 模型或 Omni V2V | **Omni**（`omni-fast` / `omni-fast-no-water` / `omni-fast-v2v-no-water`）— 约 10 秒、横/竖屏，参数见专用文档 |
 | 指定 Muse、人物静音口型或更长时长 | **Muse Video Pro**（`muse-video-pro`）— 推荐 5–40 秒、最多 4 张参考图；视频参考须生成 ≥20 秒 |
 | 当前 CLI 的首尾帧 / 参考视频驱动 | **MiniMax H3 Pro**（`minimax-h3-pro-768p` / `minimax-h3-pro-2k`）；不据此断言其他产品无首尾帧能力 |
@@ -379,6 +388,8 @@ python scripts/muse_video.py run --prompt "参考源视频动作生成连贯画�
 | 参考素材生视频（即梦 Seedance） | Available | `scripts/minimax_video.py run --model seedance2-0-pro-2 --images <图片> --videos <视频> --audios <音频>` |
 | 长时长视频（即梦 Seedance 2.5） | Available | `scripts/minimax_video.py run --model seedance2-5-pro-2 --duration 30` |
 | 文生视频 / 多素材参考（即梦 Seedance Mini 2） | Available | `scripts/minimax_video.py run --model seedance-mini-2 --prompt <提示词>`（视频/音频参考须配图） |
+| 稳定版文生视频 / 图片参考（即梦 2.0 720p-3） | Available | `scripts/minimax_video.py run --model seedance-2.0-720p-3 --prompt <提示词> --seconds 15`（15/30 秒、按次收费） |
+| 稳定版文生视频 / 多素材参考（即梦 2.5 720p-3） | Available | `scripts/minimax_video.py run --model seedance-2.5-720p-3 --prompt <提示词> --seconds 20`（5–30 秒、按次收费） |
 | 文生视频（MiniMax H3） | Available | `scripts/minimax_video.py run --model minimax-h3-768p --prompt <提示词>` |
 | 图生视频（MiniMax H3） | Available | `scripts/minimax_video.py run --model minimax-h3-2k --reference-images <图片>` |
 | 首尾帧视频（MiniMax H3） | Available | `scripts/minimax_video.py run --model minimax-h3-2k --first-image <首帧> --last-image <尾帧>` |
